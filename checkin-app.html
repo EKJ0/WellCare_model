@@ -2263,9 +2263,11 @@
     .strain-pill.low  { color: var(--risk-low);  background: rgba(74, 139, 67, 0.14); }
     .strain-pill.elev { color: var(--risk-elev); background: rgba(216, 155, 58, 0.16); }
     .strain-pill.high { color: var(--risk-high); background: rgba(181, 86, 43, 0.16); }
+    .strain-pill.severe { color: var(--risk-severe); background: rgba(139, 58, 31, 0.18); }
     :root[data-theme="dark"] .strain-pill.low  { background: rgba(123, 170, 115, 0.18); }
     :root[data-theme="dark"] .strain-pill.elev { background: rgba(212, 168, 87, 0.18); }
     :root[data-theme="dark"] .strain-pill.high { background: rgba(199, 116, 80, 0.20); }
+    :root[data-theme="dark"] .strain-pill.severe { background: rgba(163, 84, 56, 0.22); }
 
     /* SVG chart itself */
     .trend-chart-wrap { position: relative; }
@@ -2308,9 +2310,11 @@
     .trend-chart.risk-low  .area-line { stroke: var(--risk-low); }
     .trend-chart.risk-elev .area-line { stroke: var(--risk-elev); }
     .trend-chart.risk-high .area-line { stroke: var(--risk-high); }
+    .trend-chart.risk-severe .area-line { stroke: var(--risk-severe); }
     .trend-chart.risk-low  .area-dot  { fill: var(--risk-low); }
     .trend-chart.risk-elev .area-dot  { fill: var(--risk-elev); }
     .trend-chart.risk-high .area-dot  { fill: var(--risk-high); }
+    .trend-chart.risk-severe .area-dot { fill: var(--risk-severe); }
 
     /* Tooltip floating above hovered dot */
     .trend-tip {
@@ -2333,6 +2337,7 @@
     .trend-tip .strain.low  { color: var(--risk-low); }
     .trend-tip .strain.elev { color: var(--risk-elev); }
     .trend-tip .strain.high { color: var(--risk-high); }
+    .trend-tip .strain.severe { color: var(--risk-severe); }
 
     /* Empty-state card content */
     .trend-empty {
@@ -2533,8 +2538,9 @@
     const { useState, useEffect, useMemo, useRef } = React;
 
     /* =========================================================
-       MODEL — scoring (heuristic + real)
-       Unchanged from previous version.
+       MODEL — trained bundle + safety-aware hybrid layer
+       A blended probability feeds UI verdict bands:
+       Low / Moderate / High / Critical (0–100%).
        ========================================================= */
     /* The model is now trained on daily check-ins, so the signals the
        user types go straight to the scorer with no scale change.
@@ -2542,26 +2548,311 @@
        loaded — see legacyHoursScale() below. */
     function signalsForModel(s) { return s; }
 
-    /* Daily-scale heuristic — used when no trained bundle is loaded.
-       Calibrated against the new daily synthetic distribution: a normal
-       day (hours=8, sleep=7, mood=7, stress=4.5, support=7, pressure=4)
-       lands near the typical-risk baseline. */
+    /* CSV rescoring shim — defaults missing meta (feeling, tracker chips).
+       Live wizard flows always call calculateBurnoutRisk(...) directly. */
     function heuristicRisk(s, events) {
-      const E = events instanceof Set ? events : new Set(events || []);
-      const pressure  =  (s.hours - 8)  / 2
-                       + (s.stress - 5) / 3
-                       + (s.deadline_pressure - 4) / 3
-                       - (s.mood - 6) / 4;
-      const recovery  =  (s.sleep - 7)  / 1.5
-                       + (s.mgr_support - 6) / 4
-                       + (s.peer_support - 6) / 5
-                       + (E.has('pto') ? 1.5 : 0);
-      const shock     =  (E.has('layoff')          ? 0.8 : 0)
-                       + (E.has('reorg')           ? 0.5 : 0)
-                       + (E.has('deadline_crunch') ? 0.4 : 0)
-                       + (E.has('personal_shock')  ? 0.5 : 0);
-      const logit = pressure - 0.6 * recovery + shock + 0.5 * s.on_call_load - 1.2;
-      return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, logit))));
+      const evArr = events instanceof Set ? [...events] : [...(events || [])];
+      const r = calculateBurnoutRisk(s, [], {
+        feeling: 'managing',
+        events: evArr,
+      });
+      return r.scorePct / 100;
+    }
+
+    function clampRisk(x, lo, hi) {
+      return Math.max(lo, Math.min(hi, x));
+    }
+
+    /**
+     * Hybrid burnout risk — sensitive to severe combinations, trends,
+     * and baseline drift. Protective factors are capped so they cannot
+     * erase crisis-level signals.
+     *
+     * @param {object} inputs Wizard signals (hours, sleep, mood 1–10, …)
+     * @param {Array<{signals:object}>} history Newest-first past entries
+     * @param {object} [meta]
+     * @param {string} [meta.feeling] 'fine' | 'managing' | 'burned'
+     * @param {string[]|Set} [meta.events] User-facing chip keys
+     * @param {object} [meta.trackerToday] Daily category answers for today
+     */
+    function calculateBurnoutRisk(inputs, history, meta) {
+      meta = meta || {};
+      const feeling = meta.feeling || 'managing';
+      const chips = new Set(
+        Array.isArray(meta.events) ? meta.events
+          : meta.events instanceof Set ? [...meta.events]
+          : []
+      );
+      const tracker = meta.trackerToday && typeof meta.trackerToday === 'object'
+        ? meta.trackerToday : {};
+
+      const mood = clampRisk(+inputs.mood || 5, 1, 10);
+      const stress = clampRisk(+inputs.stress || 5, 1, 10);
+      const deadline = clampRisk(+inputs.deadline_pressure || 5, 1, 10);
+      const mgr = clampRisk(+inputs.mgr_support || 5, 1, 10);
+      const peer = clampRisk(+inputs.peer_support || 5, 1, 10);
+      const hours = clampRisk(+inputs.hours ?? 8, 0, 16);
+      const sleepH = clampRisk(+inputs.sleep ?? 7, 2, 14);
+      const onCall = +inputs.on_call_load || 0;
+
+      const modelEv = eventsForModel(chips);
+
+      const overwhelmChip =
+        chips.has('overwhelm') || chips.has('work_stress')
+        || chips.has('exams') || chips.has('bad_sleep');
+      const overwhelmBool = stress >= 8 || overwhelmChip;
+
+      const workloadIntensity = clampRisk(
+        (hours / 16) * 0.42 + ((deadline - 1) / 9) * 0.58,
+        0, 1,
+      );
+
+      const poorSleep = sleepH <= 5;
+      const veryPoorSleep = sleepH <= 4;
+
+      const focusStruggle = mood <= 4 && stress >= 7;
+
+      function trBad(key, badVals) {
+        const v = tracker[key];
+        return !!(v && badVals.includes(v));
+      }
+
+      /* ---------- Severe domains (count once each; capped at 8) ---------- */
+      const domains = [];
+      if (stress >= 8) domains.push({ key: 'stress_high', label: 'stress is very high' });
+      if (mood <= 3) domains.push({ key: 'mood_low', label: 'mood and energy are very low' });
+      if (poorSleep) domains.push({ key: 'sleep_hours', label: 'sleep hours have been short' });
+      if (overwhelmBool) domains.push({ key: 'overwhelm', label: 'you feel overwhelmed' });
+      if (deadline >= 8 && hours >= 10) {
+        domains.push({ key: 'load', label: 'workload volume is very heavy' });
+      }
+      if (focusStruggle) domains.push({ key: 'focus', label: 'focus has been difficult under strain' });
+      if (feeling === 'burned') domains.push({ key: 'feeling_burned', label: 'you described feeling burned out' });
+
+      if (trBad('energy', ['Drained', 'Low'])) {
+        domains.push({ key: 'tr_energy', label: 'energy was low in today\'s brief log' });
+      }
+      if (trBad('overwhelm', ['Stressed', 'Overwhelmed'])) {
+        domains.push({ key: 'tr_over', label: 'pressure felt high in today\'s brief log' });
+      }
+      if (trBad('motivation', ['Very difficult', 'Difficult'])) {
+        domains.push({ key: 'tr_mot', label: 'motivation has been hard to find' });
+      }
+      if (trBad('sleepQuality', ['Poor'])) {
+        domains.push({ key: 'tr_sleepq', label: 'sleep quality was poor today' });
+      }
+      if (trBad('workStudyPressure', ['High', 'Extreme'])) {
+        domains.push({ key: 'tr_press', label: 'study/work pressure spiked today' });
+      }
+
+      /* Dedupe by key */
+      const domMap = new Map();
+      for (const d of domains) domMap.set(d.key, d.label);
+      const severeCount = domMap.size;
+
+      /* ---------- Baseline layer (0–100), NOT a plain average ---------- */
+      let baseline =
+        Math.pow((stress - 1) / 9, 1.35) * 38
+        + Math.pow((11 - mood) / 10, 1.25) * 30;
+
+      if (sleepH <= 4) baseline += 26;
+      else if (sleepH <= 5) baseline += 18;
+      else if (sleepH <= 6) baseline += 10;
+      else if (sleepH >= 8) baseline -= 4;
+
+      baseline += workloadIntensity * 22;
+
+      baseline += Math.pow((deadline - 1) / 9, 1.2) * 6;
+
+      if (modelEv.has('deadline_crunch')) baseline += 7;
+      if (modelEv.has('personal_shock')) baseline += 9;
+      if (modelEv.has('reorg')) baseline += 6;
+      if (modelEv.has('layoff')) baseline += 14;
+
+      if (onCall >= 1.1) baseline += 10;
+      else if (onCall >= 0.55) baseline += 5;
+
+      if (feeling === 'burned') baseline += 18;
+      else if (feeling === 'managing') baseline += 3;
+
+      /* ---------- Combo multipliers (dangerous intersections) ---------- */
+      let comboBoost = 1;
+      if (stress >= 8 && mood <= 3) comboBoost *= 1.45;
+      if (stress >= 8 && veryPoorSleep && overwhelmBool) comboBoost *= 1.38;
+      if (poorSleep && workloadIntensity >= 0.55 && stress >= 7) comboBoost *= 1.22;
+      if (mood <= 4 && mgr <= 4 && peer <= 4) comboBoost *= 1.12;
+
+      baseline *= comboBoost;
+
+      /* ---------- Trend vs personal baseline (recent history) ---------- */
+      const hist = Array.isArray(history) ? history.slice(0, 28) : [];
+      const pastSignals = hist.map(h => h.signals || h).filter(Boolean);
+
+      let trendBoost = 0;
+      const histReasons = [];
+
+      if (pastSignals.length >= 3) {
+        const avg = (pick) => mean(pastSignals.slice(0, 12).map(pick));
+        const avgStress = avg(s => +s.stress || 5);
+        const avgMood = avg(s => +s.mood || 5);
+        const avgSleep = avg(s => +s.sleep || 7);
+
+        if (stress >= avgStress + 2) {
+          trendBoost += 10;
+          histReasons.push('stress is higher than your recent usual');
+        }
+        if (mood <= avgMood - 2) {
+          trendBoost += 10;
+          histReasons.push('mood is lower than your recent usual');
+        }
+        if (sleepH <= avgSleep - 1.25) {
+          trendBoost += 8;
+          histReasons.push('sleep is worse than your recent usual');
+        }
+
+        const slopeS = slope(pastSignals.slice(0, 7).map(s => +s.stress || 5).reverse());
+        const slopeM = slope(pastSignals.slice(0, 7).map(s => +s.mood || 5).reverse());
+        if (slopeS > 0.35 && stress >= 7) {
+          trendBoost += 8;
+          histReasons.push('stress has been climbing over recent check-ins');
+        }
+        if (slopeM < -0.35 && mood <= 5) {
+          trendBoost += 8;
+          histReasons.push('mood has been slipping over recent check-ins');
+        }
+      }
+
+      baseline += trendBoost;
+
+      /* ---------- Protective layer (soft cap) ---------- */
+      let protective =
+        clampRisk((mgr - 5) / 5, 0, 1) * 5
+        + clampRisk((peer - 5) / 5, 0, 1) * 4;
+
+      if (modelEv.has('pto')) protective += 7;
+
+      const hydrationGood = tracker.hydration === 'Good';
+      const movementGood = tracker.movement === 'Active';
+      const breaksEnough = tracker.breaks === 'Enough';
+      if (hydrationGood) protective += 2;
+      if (movementGood) protective += 3;
+      if (breaksEnough) protective += 2;
+
+      const protectCap = baseline >= 52 ? 10 : 16;
+      baseline -= Math.min(protectCap, protective);
+
+      let score = clampRisk(baseline, 0, 100);
+
+      /* ---------- Minimum floors (cannot average away crisis) ---------- */
+      const floors = [];
+
+      if (stress >= 8 && mood <= 3) {
+        floors.push(65);
+        histReasons.push('high stress paired with very low energy');
+      }
+      if (stress >= 8 && sleepH <= 4 && overwhelmBool) {
+        floors.push(75);
+      }
+      if (severeCount >= 3) floors.push(70);
+      if (feeling === 'burned' && stress >= 7 && mood <= 4) {
+        floors.push(82);
+      }
+
+      /* Extreme exhaustion / cannot function */
+      if ((feeling === 'burned' && mood <= 2 && stress >= 8)
+          || (mood <= 2 && stress >= 9 && poorSleep)) {
+        floors.push(92);
+      }
+
+      /* Repeated severe days from stored risk history */
+      let severeRun = 0;
+      for (const e of hist) {
+        const r = typeof e.risk === 'number' ? e.risk : null;
+        if (r != null && r >= 0.70) severeRun++;
+        else break;
+      }
+      if (severeRun >= 2 && severeCount >= 2) floors.push(80);
+
+      const floorVal = floors.length ? Math.max(...floors) : 0;
+      if (floorVal > 0) score = Math.max(score, floorVal);
+
+      /* ---------- Reasons narrative ---------- */
+      const topReasons = [];
+
+      if (stress >= 7) topReasons.push('stress is elevated');
+      if (mood <= 4) topReasons.push('energy / mood is depleted');
+      if (poorSleep) topReasons.push('sleep has been short');
+      if (workloadIntensity >= 0.5 || deadline >= 8) topReasons.push('workload pressure is high');
+      if (overwhelmBool) topReasons.push('overwhelm is present');
+
+      for (const hr of histReasons) {
+        if (!topReasons.includes(hr)) topReasons.push(hr);
+      }
+
+      if (severeRun >= 2 && score >= 55) {
+        topReasons.push('several consecutive high-risk days');
+      }
+
+      /* Dedupe while preserving order */
+      const seen = new Set();
+      const uniqReasons = [];
+      for (const t of topReasons) {
+        if (!seen.has(t)) { seen.add(t); uniqReasons.push(t); }
+      }
+
+      let explain = '';
+      if (uniqReasons.length > 0 && score >= 31) {
+        explain =
+          'Your risk increased because ' +
+          uniqReasons.slice(0, 4).join(', ') + '.';
+      } else if (score >= 56) {
+        explain =
+          'Several strain signals came together today — worth slowing down.';
+      } else {
+        explain =
+          'Overall strain looks manageable right now — keep checking in.';
+      }
+
+      /* ---------- Tier + advice ---------- */
+      const roundedScore = Math.round(score);
+      const vObj = verdict(roundedScore / 100);
+
+      let recommendedAction;
+      let safetyNetSuggested;
+
+      if (roundedScore <= 30) {
+        recommendedAction =
+          'Maintain routines that help you recover; small habits compound.';
+        safetyNetSuggested = false;
+      } else if (roundedScore <= 55) {
+        recommendedAction =
+          'Schedule real breaks, protect sleep, and lighten one obligation if you can.';
+        safetyNetSuggested = false;
+      } else if (roundedScore <= 75) {
+        recommendedAction =
+          'Tell someone you trust how you are doing, cut non-essential load this week, '
+          + 'and consider professional support if this persists.';
+        safetyNetSuggested = true;
+      } else {
+        recommendedAction =
+          'Prioritize safety: reach out to a trusted contact or crisis line now, '
+          + 'rest aggressively, and seek urgent professional help if you feel unsafe.';
+        safetyNetSuggested = true;
+      }
+
+      return {
+        scorePct: roundedScore,
+        scoreProb: clampRisk(roundedScore / 100, 0, 1),
+        riskLevel: vObj.label,
+        verdict: vObj,
+        topReasons: uniqReasons.slice(0, 6),
+        explain,
+        recommendedAction,
+        safetyNetSuggested,
+        severeDomains: [...domMap.entries()].map(([k, label]) => ({ key: k, label })),
+        severeCount,
+        floorsApplied: floors.length ? floorVal : null,
+      };
     }
 
     function sigmoid(z) { return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z)))); }
@@ -2787,17 +3078,32 @@
                   .slice(0, 5);
     }
 
-    function verdict(p) {
-      if (p < 0.06) return { label: 'Low',      key: 'low',     color: 'var(--risk-low)',
-                             note: 'Well below the typical baseline. Keep doing what you\'re doing.' };
-      if (p < 0.18) return { label: 'Typical',  key: 'typical', color: 'var(--risk-typical)',
-                             note: 'Around the average week. Nothing unusual.' };
-      if (p < 0.36) return { label: 'Elevated', key: 'elev',    color: 'var(--risk-elev)',
-                             note: '2–3x baseline. Worth paying attention to next week.' };
-      if (p < 0.60) return { label: 'High',     key: 'high',    color: 'var(--risk-high)',
-                             note: '3–5x baseline. Take recovery seriously.' };
-      return            { label: 'Severe',   key: 'severe',  color: 'var(--risk-severe)',
-                          note: '5x+ baseline. Reach out to your manager or a professional.' };
+    function verdict(pProb) {
+      const pct = Math.round(Math.max(0, Math.min(1, pProb || 0)) * 100);
+      if (pct <= 30) return {
+        label: 'Low',
+        key: 'low',
+        color: 'var(--risk-low)',
+        note: 'Patterns look steadier — keep nurturing recovery.',
+      };
+      if (pct <= 55) return {
+        label: 'Moderate',
+        key: 'elev',
+        color: 'var(--risk-elev)',
+        note: 'Worth tuning recovery before things snowball.',
+      };
+      if (pct <= 75) return {
+        label: 'High',
+        key: 'high',
+        color: 'var(--risk-high)',
+        note: 'Serious strain — treat recovery as the main priority.',
+      };
+      return {
+        label: 'Critical',
+        key: 'severe',
+        color: 'var(--risk-severe)',
+        note: 'Crisis-level strain — please reach out for immediate support.',
+      };
     }
 
     /* =========================================================
@@ -3116,13 +3422,13 @@
 
       let elevStreak = 0;
       for (const e of personHist) {
-        if (e.risk >= 0.18) elevStreak++; else break;
+        if (e.risk >= 0.56) elevStreak++; else break;
       }
       if (elevStreak >= 3) {
         out.push({ kind: 'bad', text:
-          `${elevStreak} weeks in a row at elevated or higher risk.` });
+          `${elevStreak} check-ins in a row at high strain or higher.` });
       } else if (elevStreak === 2) {
-        out.push({ kind: 'warn', text: `Second consecutive elevated week.` });
+        out.push({ kind: 'warn', text: `Second consecutive day at high strain or higher.` });
       }
 
       if (personHist.length >= 4) {
@@ -3279,7 +3585,13 @@
         const events = eventsRaw;
         const feeling = r.feeling || (parseInt(r.burnout) === 1 ? 'burned' : 'managing');
         const eventSet = new Set(events);
-        const risk = scorer(signals, eventSet);
+        const priorNewestFirst = next
+          .filter(e =>
+            e.person_id === person_id
+            && new Date(e.when).getTime() < new Date(when).getTime())
+          .sort((a, b) => new Date(b.when) - new Date(a.when))
+          .slice(0, 28);
+        const risk = scorer(signals, eventSet, feeling, priorNewestFirst);
         next.push({
           id: now + i, when, person_id, signals, events, feeling,
           notes: r.notes || '',
@@ -4055,7 +4367,12 @@
        RESULT screen
        ========================================================= */
     function ResultScreen({ result, onDismiss }) {
-      const { entry, v, drivers, modelLabel } = result;
+      const {
+        entry, v, drivers, modelLabel,
+        hybridExplain, hybridAction, safetyNetSuggested,
+      } = result;
+      const reasonDrivers = (drivers || []).filter(d => d.kind === 'reason');
+      const modelDrivers  = (drivers || []).filter(d => d.kind === 'model');
       return (
         <div className="result-screen">
           <div className="result-hero" data-risk={v.key}>
@@ -4068,10 +4385,29 @@
             <span className="badge muted" style={{ marginBottom: 16, display: 'inline-flex' }}>
               {modelLabel}
             </span>
-            {drivers && drivers.length > 0 && (
+            {hybridExplain && (
+              <div className="card" style={{ marginBottom: 16 }}>
+                <div className="card-title">Why this score</div>
+                <div style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text)' }}>
+                  {hybridExplain}
+                </div>
+              </div>
+            )}
+            {reasonDrivers.length > 0 && (
               <>
-                <h3>What's pushing this</h3>
-                {drivers.map(d => (
+                <h3>Signals we weighted</h3>
+                {reasonDrivers.map(d => (
+                  <div key={d.key} className="driver up">
+                    <span className="pill">·</span>
+                    <span className="lbl">{d.label}</span>
+                  </div>
+                ))}
+              </>
+            )}
+            {modelDrivers.length > 0 && (
+              <>
+                <h3>Model contributors</h3>
+                {modelDrivers.map(d => (
                   <div key={d.key} className={`driver ${d.c < 0 ? 'down' : 'up'}`}>
                     <span className="pill">{d.c < 0 ? '↓' : '↑'}</span>
                     <span className="lbl">{d.label}</span>
@@ -4079,6 +4415,27 @@
                   </div>
                 ))}
               </>
+            )}
+            {hybridAction && (
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="card-title">Suggested next step</div>
+                <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                  {hybridAction}
+                </div>
+              </div>
+            )}
+            {safetyNetSuggested && (
+              <div className="card" style={{
+                marginTop: 16,
+                borderColor: 'color-mix(in srgb, var(--primary) 35%, var(--border))',
+                background: 'var(--primary-soft)',
+              }}>
+                <div className="card-title">Safety Net</div>
+                <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.55 }}>
+                  Strain is high enough that letting someone you trust know what is going on may help.
+                  Open <strong>Home</strong> → Safety Net to send a gentle invite.
+                </div>
+              </div>
             )}
             {entry.notes && (
               <div className="card" style={{ marginTop: 16 }}>
@@ -4784,8 +5141,9 @@
        - Smooth curve + soft gradient area + dots + tooltip
        ========================================================= */
     function riskLevel(pct100) {
-      if (pct100 >= 70) return { key: 'high', label: 'High strain' };
-      if (pct100 >= 40) return { key: 'elev', label: 'Elevated strain' };
+      if (pct100 >= 76) return { key: 'severe', label: 'Critical strain' };
+      if (pct100 >= 56) return { key: 'high', label: 'High strain' };
+      if (pct100 >= 31) return { key: 'elev', label: 'Moderate strain' };
       return { key: 'low', label: 'Lower strain' };
     }
 
@@ -4914,7 +5272,8 @@
       }
 
       // 7. Risk colour for the gradient — driven by *latest* point.
-      const stopColor = lvl.key === 'high' ? 'var(--risk-high)'
+      const stopColor = lvl.key === 'severe' ? 'var(--risk-severe)'
+                      : lvl.key === 'high' ? 'var(--risk-high)'
                       : lvl.key === 'elev' ? 'var(--risk-elev)'
                       :                      'var(--risk-low)';
 
@@ -5415,7 +5774,7 @@
       }
 
       const avg = rows.reduce((s, r) => s + r.latest.risk, 0) / rows.length;
-      const elevated = rows.filter(r => r.latest.risk >= 0.18).length;
+      const elevated = rows.filter(r => r.latest.risk >= 0.31).length;
 
       return (
         <div className="pane">
@@ -5758,14 +6117,20 @@
       // Scoring function used when backfilling risk on imported CSV rows.
       // Translates chip keys -> model events on the way in.
       const scoreFn = useMemo(() => {
-        if (bundle && bundle.feature_cols && bundle.logreg && bundle.gbt) {
-          return (s, ev) => realModelScore(
-            bundle, s,
-            eventsForModel(ev instanceof Set ? ev : new Set(ev))
-          ).ensemble_mean;
-        }
-        return (s, ev) => heuristicRisk(s,
-          eventsForModel(ev instanceof Set ? ev : new Set(ev)));
+        return (s, ev, feeling = 'managing', histSlice = []) => {
+          const chipSet = ev instanceof Set ? ev : new Set(ev || []);
+          const hybrid = calculateBurnoutRisk(s, histSlice, {
+            feeling,
+            events: [...chipSet],
+          });
+          let prob = hybrid.scoreProb;
+          if (bundle && bundle.feature_cols && bundle.logreg && bundle.gbt) {
+            const modelEv = eventsForModel(chipSet);
+            const out = realModelScore(bundle, s, modelEv, histSlice);
+            prob = Math.max(out.ensemble_mean, prob);
+          }
+          return prob;
+        };
       }, [bundle]);
 
       // Person-filtered slices
@@ -5804,28 +6169,41 @@
 
       const handleSave = ({ signals, feeling, events, notes }) => {
         const eventSet = new Set(events);
-        // Daily-trained bundles eat the signals as-is; legacy weekly
-        // bundles get hours rescaled inside buildFeatureRow.
         const modelSignals = signalsForModel(signals);
-        // Translate user chips ("Exams / deadlines", "Family stuff", ...)
-        // into the model's event vocabulary (deadline_crunch, etc.).
         const modelEventSet = eventsForModel(eventSet);
-        // Feed the user's past check-ins into the scorer so rolling
-        // features (7-day mean, 28-day mean, std, slope, event recency)
-        // reflect reality instead of pretending today repeats forever.
         const historyForModel = personHist.slice(0, 60).map(h => ({
           signals: h.signals,
           events:  [...eventsForModel(new Set(h.events || []))],
         }));
-        let scoreOutput = null, drivers = null, risk;
+        const historyForHybrid = personHist.slice(0, 28);
+
+        const trackerToday = getTrackerToday(activeProfile.personId);
+        const hybrid = calculateBurnoutRisk(modelSignals, historyForHybrid, {
+          feeling,
+          events: [...eventSet],
+          trackerToday,
+        });
+
+        let scoreOutput = null;
+        let risk = hybrid.scoreProb;
+
+        const driverReasons = hybrid.topReasons.map((label, i) => ({
+          key: 'reason-' + i,
+          kind: 'reason',
+          label,
+          c: 0,
+        }));
+        let drivers = driverReasons;
+
         if (bundle && bundle.feature_cols && bundle.logreg && bundle.gbt) {
           scoreOutput = realModelScore(bundle, modelSignals, modelEventSet, historyForModel);
-          risk = scoreOutput.ensemble_mean;
-          drivers = realModelDrivers(bundle, scoreOutput);
-        } else {
-          risk = heuristicRisk(modelSignals, modelEventSet);
-          drivers = heuristicDrivers(modelSignals, modelEventSet);
+          risk = Math.max(risk, scoreOutput.ensemble_mean);
+          const md = realModelDrivers(bundle, scoreOutput).map(d => ({
+            ...d, kind: 'model',
+          }));
+          drivers = [...driverReasons, ...md];
         }
+
         const v = verdict(risk);
         const entry = {
           id: Date.now(),
@@ -5839,7 +6217,12 @@
         setHistory(h => [entry, ...h].slice(0, 1000));
         setResult({
           entry, v, drivers,
-          modelLabel: scoreOutput ? 'trained model' : 'heuristic',
+          hybridExplain: hybrid.explain,
+          hybridAction: hybrid.recommendedAction,
+          safetyNetSuggested: hybrid.safetyNetSuggested,
+          modelLabel: scoreOutput
+            ? 'Trained model blended with safety-aware check'
+            : 'Safety-aware score',
         });
         setShowWizard(false);
       };

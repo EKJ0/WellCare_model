@@ -1,0 +1,43 @@
+WellCare database — apply on InsForge (Postgres)
+
+FILES (run in order)
+  1) schema_wellcare.sql       — tables + RLS
+  2) 002_dashboard_views.sql   — views for “today” + full history browsing
+
+SEE TABLES IN INSFORGE
+  Dashboard → Database → Tables  → look for wellcare_* tables and wellcare_v_* views
+
+SEE TODAY’S DATA & HISTORY
+  Dashboard → Database → SQL Editor → paste snippets from queries_dashboard.sql
+  Important views:
+    wellcare_v_checkins_today     — everything logged today (wizard check-ins)
+    wellcare_v_checkins_history   — full timeline (ORDER BY submitted_at DESC)
+    wellcare_v_daily_tracker_today — today’s category chips
+    wellcare_v_stats_summary      — counts + last check-in timestamp
+
+IF TABLES ARE EMPTY
+  Schema only defines storage; checkin-app.html still saves to localStorage until
+  you add InsForge Auth + API sync to INSERT rows. Empty ≠ broken migration.
+
+DATA NEVER MIXES ACROSS PEOPLE (for training)
+  - owner_user_id       — authenticated account.
+  - profile_person_id   — same as app profile.personId / CSV person_id.
+  Always filter exports/models by BOTH.
+
+ORDER OF SYNC IN APP (when you implement API writes)
+  1) Upsert wellcare_profiles
+  2) Insert check-ins / tracker / safety_net / settings / bundles
+
+HOW TO RUN SQL
+  - SQL Editor: paste each file and execute (or use Migrations page if you prefer).
+  - CLI: npx @insforge/cli db query "..."  (escape quotes if one-liner)
+
+RLS
+  End-user JWTs only see their owner_user_id. SQL Editor / postgres role
+  typically bypasses RLS so you can audit all collected rows.
+
+NOTE ON FOREIGN KEYS
+  Check-ins and tracker rows require a matching wellcare_profiles row first.
+
+TIME ZONE
+  “Today” views use UTC calendar dates. Change AT TIME ZONE if you want local TZ.
