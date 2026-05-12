@@ -153,7 +153,8 @@
       height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
       border-bottom: 1px solid rgba(0,0,0,0.04);
       position: relative;
-      z-index: 5;
+      z-index: 20;
+      view-transition-name: none;
     }
     .app-header h1 {
       font-size: 15px;
@@ -176,22 +177,104 @@
       overflow-x: hidden;
       scrollbar-gutter: stable;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       background: var(--bg);
+      /* Space above fixed tab bar — scroll area ends above navigator */
+      padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + 10px);
     }
     .app-main::-webkit-scrollbar { width: 6px; }
     .app-main::-webkit-scrollbar-thumb {
       background: var(--border-strong); border-radius: 3px;
     }
 
-    .tabbar {
-      flex: 0 0 var(--tabbar-h);
+    /* Smooth tab changes — View Transitions API where supported */
+    .tab-page.vt-root {
+      view-transition-name: app-tab-pane;
+      min-height: 100%;
+    }
+
+    @keyframes tab-enter-fwd {
+      from { opacity: 0; transform: translateX(14px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes tab-enter-back {
+      from { opacity: 0; transform: translateX(-14px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes tab-enter-fade {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .tab-page.tab-fallback.tab-dir-fwd {
+      animation: tab-enter-fwd 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .tab-page.tab-fallback.tab-dir-back {
+      animation: tab-enter-back 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    .tab-page.tab-fallback.tab-dir-neutral {
+      animation: tab-enter-fade 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tab-page.tab-fallback {
+        animation: none !important;
+      }
+      ::view-transition-old(app-tab-pane),
+      ::view-transition-new(app-tab-pane) {
+        animation: none !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      ::view-transition-old(app-tab-pane) {
+        animation: vt-tab-out 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      ::view-transition-new(app-tab-pane) {
+        animation: vt-tab-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+    }
+
+    @keyframes vt-tab-out {
+      from { opacity: 1; transform: translateX(0); }
+      to   { opacity: 0; transform: translateX(-10px); }
+    }
+    @keyframes vt-tab-in {
+      from { opacity: 0; transform: translateX(12px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Bottom nav: fixed OUTSIDE .shell so overflow:hidden cannot clip or
+       anchor it; dock is full-width flex center — no translateX on the bar. */
+    .tabbar-dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      pointer-events: none;
+      view-transition-name: none;
+    }
+    .tabbar-dock .tabbar {
+      pointer-events: auto;
+      position: relative;
+      flex-shrink: 0;
+      width: min(100vw, var(--app-max-w));
+      max-width: var(--app-max-w);
       height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
       padding-bottom: env(safe-area-inset-bottom, 0px);
       display: flex;
+      box-sizing: border-box;
+      margin: 0;
       background: var(--surface);
       border-top: 1px solid var(--border);
       box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
-      z-index: 5;
+      transform: none;
+      will-change: auto;
+      view-transition-name: none;
     }
     .tab {
       flex: 1;
@@ -207,6 +290,8 @@
     }
     .tab svg { width: 22px; height: 22px; }
     .tab.active { color: var(--primary); }
+    /* Don't shift the dock when pressing tabs */
+    .tab:active { transform: none; }
     .tab.active::before {
       content: '';
       position: absolute; top: 0; left: 50%;
@@ -1658,6 +1743,37 @@
     .action-row:active { transform: scale(0.995); }
     .action-row .chev { color: var(--text-soft); flex-shrink: 0; }
 
+    /* Where scoring data / model bundle are loaded from (visible audit trail) */
+    .engine-source-strip {
+      margin-top: 12px;
+      padding: 11px 14px;
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--border));
+      border: 1px solid var(--border);
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .engine-source-strip.is-compact {
+      margin-top: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+    }
+    .engine-source-strip .engine-source-head {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+    .engine-source-strip.is-compact .engine-source-head {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .engine-source-strip .engine-source-path + .engine-source-path {
+      margin-top: 4px;
+    }
+
     /* =========================================================
        Safety Net — premium full-feature panel
        ========================================================= */
@@ -2177,34 +2293,74 @@
     }
 
     /* Burnout-risk ring donut */
-    .ring-card { text-align: center; padding-bottom: 22px; }
-    .ring-card .ring-wrap {
-      display: flex; flex-direction: column; align-items: center;
-      margin: 8px 0 14px;
+    .ring-card {
+      text-align: center;
+      padding: 22px 18px 26px;
     }
-    .ring-svg { display: block; }
+    .ring-card .panel-head {
+      justify-content: center;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .ring-card .panel-head > div {
+      max-width: 22rem;
+      margin: 0 auto;
+    }
+    .ring-card .panel-title {
+      letter-spacing: 0.04em;
+      word-spacing: 0.06em;
+      line-height: 1.28;
+    }
+    .ring-card .panel-sub {
+      margin-top: 10px;
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+      word-spacing: 0.03em;
+    }
+    .ring-card .ring-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 16px 0 18px;
+    }
+    .ring-svg { display: block; overflow: visible; }
     .ring-track  { stroke: var(--surface-2); }
     .ring-fill   { stroke: var(--risk-elev); transition: stroke-dashoffset 0.4s; }
     .ring-pct {
       font-family: var(--display-font);
-      font-size: 44px;
+      font-size: 46px;
       font-weight: 700;
-      letter-spacing: -1px;
+      letter-spacing: 0.05em;
+      font-variant-numeric: tabular-nums;
     }
+    /* Same voice as .ring-pct — display serif, sized/stepped down */
     .ring-label {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-top: 2px;
+      font-family: var(--display-font);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      word-spacing: 0.14em;
+      text-transform: none;
+      line-height: 1.5;
     }
+    /* Supporting context stays sans — readable small type */
     .ring-foot {
-      display: flex; flex-direction: column;
+      font-family: var(--sans-font);
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 10px;
       font-size: 13px;
-      margin-top: 6px;
+      margin-top: 14px;
+      padding-top: 6px;
+      line-height: 1.55;
+      letter-spacing: 0.03em;
+      word-spacing: 0.04em;
     }
     .ring-foot .compare {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       color: var(--text-soft);
     }
     .ring-foot .compare::before {
@@ -2549,7 +2705,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
     /* =========================================================
        MODEL — trained bundle + safety-aware hybrid layer
@@ -3130,7 +3286,8 @@
     const STORAGE_KEY_V1   = 'burnout_checkins_v1';
     const THEME_KEY        = 'burnout_theme';
     const REMIND_KEY       = 'burnout_remind_dow';
-    const BUNDLE_KEY       = 'burnout_model_bundle';
+    const BUNDLE_KEY             = 'burnout_model_bundle';
+    const BUNDLE_SOURCE_META_KEY = 'wellcare_bundle_source_meta';
     const PROFILES_KEY     = 'burnout_profiles_v1';
     const ACTIVE_KEY       = 'burnout_active_profile';
     const TRACKER_KEY      = 'burnout_tracker_v1';
@@ -3291,6 +3448,78 @@
         else   localStorage.removeItem(BUNDLE_KEY);
       } catch {}
     }
+
+    function loadBundleSourceMeta() {
+      try {
+        const s = localStorage.getItem(BUNDLE_SOURCE_META_KEY);
+        return s ? JSON.parse(s) : null;
+      } catch { return null; }
+    }
+    function saveBundleSourceMeta(m) {
+      try {
+        if (m == null) localStorage.removeItem(BUNDLE_SOURCE_META_KEY);
+        else localStorage.setItem(BUNDLE_SOURCE_META_KEY, JSON.stringify(m));
+      } catch {}
+    }
+
+    /** Human-visible description of where the active scoring bundle comes from. */
+    function bundleSourceDisplay(bundle, meta) {
+      if (!bundle) {
+        return {
+          mode: 'heuristic',
+          title: 'Scoring source',
+          paths: [
+            'Built-in heuristic only — no trained ML bundle is active.',
+            'Training pipeline (project): train.py / outputs/train_real.py → outputs/bundle_to_js.py → model_bundle.js next to checkin-app.html.',
+            'CSV round-trip uses outputs/load_real.py with exports from Profile → Data.',
+          ],
+        };
+      }
+      const fromScript = typeof window !== 'undefined'
+        && window.MODEL_BUNDLE
+        && bundle === window.MODEL_BUNDLE;
+      if (fromScript) {
+        return {
+          mode: 'trained',
+          title: 'Scoring source',
+          paths: [
+            'Trained bundle: model_bundle.js',
+            'Loaded automatically via this page’s script tag (same folder as checkin-app.html).',
+            'Override: Profile → Scoring engine → load another bundle from disk.',
+          ],
+        };
+      }
+      if (meta && meta.kind === 'file' && meta.filename) {
+        return {
+          mode: 'trained',
+          title: 'Scoring source',
+          paths: [
+            'Trained bundle file: ' + meta.filename,
+            'Loaded from your device; a copy is saved under localStorage key burnout_model_bundle.',
+            'Revert or replace from Profile → Scoring engine.',
+          ],
+        };
+      }
+      return {
+        mode: 'trained',
+        title: 'Scoring source',
+        paths: [
+          'Trained bundle restored from browser storage.',
+          'localStorage key: burnout_model_bundle.',
+          'Reload from disk via Profile → Scoring engine if you want a named file shown here.',
+        ],
+      };
+    }
+
+    /** Profile → Data: where CSV / history live (no remote backend in this build). */
+    const DATA_FILES_HELP = {
+      title: 'Your check-in data',
+      paths: [
+        'Stored in this browser under localStorage key burnout_checkins_v2.',
+        'Export writes a dated CSV to your Downloads folder (Profile → Export check-ins).',
+        'Import expects compatible CSV from this app or from outputs/load_real.py / training pipelines.',
+      ],
+    };
     function applyTheme(theme) {
       const isDark = theme === 'dark' ||
         (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -4377,10 +4606,22 @@
       );
     }
 
+    function EngineSourceStrip({ info, compact }) {
+      if (!info) return null;
+      return (
+        <div className={'engine-source-strip' + (compact ? ' is-compact' : '')}>
+          <div className="engine-source-head">{info.title}</div>
+          {info.paths.map((line, i) => (
+            <div key={i} className="engine-source-path">{line}</div>
+          ))}
+        </div>
+      );
+    }
+
     /* =========================================================
        RESULT screen
        ========================================================= */
-    function ResultScreen({ result, onDismiss }) {
+    function ResultScreen({ result, onDismiss, engineSource }) {
       const {
         entry, v, drivers, modelLabel,
         hybridExplain, hybridAction, safetyNetSuggested,
@@ -4396,9 +4637,10 @@
             <div className="verdict-note">{v.note}</div>
           </div>
           <div className="result-body">
-            <span className="badge muted" style={{ marginBottom: 16, display: 'inline-flex' }}>
+            <span className="badge muted" style={{ marginBottom: 10, display: 'inline-flex' }}>
               {modelLabel}
             </span>
+            <EngineSourceStrip info={engineSource} compact />
             {hybridExplain && (
               <div className="card" style={{ marginBottom: 16 }}>
                 <div className="card-title">Why this score</div>
@@ -4591,11 +4833,13 @@
        TAB CONTENT — Home
        ========================================================= */
     function HomeTab({ activeProfile, personHist, stats,
-                       onStartCheckin, onGoDashboard, onGoTracker, onManageProfiles }) {
+                       onStartCheckin, onGoDashboard, onGoTracker }) {
       const thisWeekKey = isoDate(new Date());
       const thisWeek = personHist.find(e =>
         isoDate(new Date(e.when)) === thisWeekKey);
       const firstName = activeProfile.name.split(' ')[0];
+
+      const snPanelRef = React.useRef(null);
 
       /* ----- Safety Net state ----- */
       const [snOpen, setSnOpen] = React.useState(false);
@@ -4705,6 +4949,13 @@
         setSnContacts(cs => cs.filter(c => c.id !== id));
       }
 
+      function scrollToSafetyNet() {
+        snPanelRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+
       return (
         <div className="pane">
           <div className="eyebrow-pill">
@@ -4777,7 +5028,9 @@
           {/* =========================================================
               Safety Net — full feature panel
               ========================================================= */}
-          <section className="panel safety-net-panel" aria-labelledby="sn-title">
+          <section ref={snPanelRef}
+                   className="panel safety-net-panel"
+                   aria-labelledby="sn-title">
             <div className="sn-hero">
               <div className="sn-shield" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -5115,7 +5368,8 @@
                       strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            <button className="action-row" onClick={onManageProfiles}>
+            <button type="button" className="action-row"
+                    onClick={scrollToSafetyNet}>
               <span>Manage trusted contacts</span>
               <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
@@ -5134,7 +5388,7 @@
       const r = 70;
       const C = 2 * Math.PI * r;
       const offset = C * (1 - Math.max(0, Math.min(1, pct)));
-      const size = 184;
+      const size = 200;
       const c = size / 2;
       return (
         <div className="ring-wrap">
@@ -5150,13 +5404,14 @@
                     style={{ stroke: color,
                              transform: `rotate(-90deg)`,
                              transformOrigin: 'center' }}/>
-            <text x={c} y={c - 2} className="ring-pct"
+            <text x={c} y={c - 8} className="ring-pct"
                   style={{ fill: color }}
                   textAnchor="middle" dominantBaseline="middle">
               {(pct * 100).toFixed(0)}%
             </text>
-            <text x={c} y={c + 28} className="ring-label"
-                  textAnchor="middle">
+            <text x={c} y={c + 42} className="ring-label"
+                  style={{ fill: color }}
+                  textAnchor="middle" dominantBaseline="middle">
               {label}
             </text>
           </svg>
@@ -5530,7 +5785,7 @@
           </div>
 
           <div className="panel ring-card">
-            <div className="panel-head" style={{ marginBottom: 4 }}>
+            <div className="panel-head">
               <div>
                 <div className="panel-title">Burnout Risk</div>
                 <div className="panel-sub">
@@ -5854,7 +6109,7 @@
       activeProfile, profiles, history,
       theme, setTheme,
       reminderDow, requestReminder,
-      bundle, onLoadBundle, onClearBundle,
+      bundle, engineSource, onLoadBundle, onClearBundle,
       onExport, onImportClick,
       onManageProfiles, onSignOut,
       onClearAll,
@@ -5943,15 +6198,10 @@
               <div className="panel-title">Scoring engine</div>
             </div>
             <div className="action-row" style={{ cursor: 'default' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>
-                  {bundle ? 'Trained model active' : 'Built-in heuristic'}
-                </div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-soft)', marginTop: 2 }}>
-                  {bundle
-                    ? 'Loaded from model_bundle.js'
-                    : 'Run train.py + bundle_to_js.py to load.'}
-                </div>
+              <div style={{ fontWeight: 600 }}>
+                {engineSource && engineSource.mode === 'trained'
+                  ? 'Trained model active'
+                  : 'Built-in heuristic'}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="icon-btn solid" onClick={onLoadBundle}
@@ -5974,12 +6224,14 @@
                 )}
               </div>
             </div>
+            <EngineSourceStrip info={engineSource} compact />
           </div>
 
           <div className="panel">
             <div className="panel-head">
               <div className="panel-title">Data</div>
             </div>
+            <EngineSourceStrip info={DATA_FILES_HELP} compact />
             <button className="action-row" onClick={onExport}
                     disabled={history.length === 0}>
               <span>Export check-ins (CSV)</span>
@@ -6046,6 +6298,16 @@
       { id: 'profile',  label: 'Profile' },
     ];
 
+    /** Tab bar order — used for subtle slide direction on change */
+    const MAIN_TAB_ORDER = ['home', 'insights', 'tracker', 'profile'];
+    const SUPPORTS_VIEW_TRANSITION =
+      typeof document !== 'undefined'
+      && typeof document.startViewTransition === 'function';
+
+    /** Horizontal swipe distance (px) to move between main tabs */
+    const SWIPE_TAB_MIN_PX = 64;
+    const SWIPE_TAB_MAX_MS = 720;
+
     function App() {
       // Profiles + sign-in
       const [profiles, setProfiles]       = useState(() => loadProfiles());
@@ -6058,11 +6320,18 @@
       // History + bundle + prefs
       const [history, setHistory]         = useState(loadHistory());
       const [bundle,  setBundle]          = useState(loadBundle());
+      const [bundleSourceMeta, setBundleSourceMeta] = useState(() =>
+        loadBundleSourceMeta());
+      const engineSource = useMemo(
+        () => bundleSourceDisplay(bundle, bundleSourceMeta),
+        [bundle, bundleSourceMeta]
+      );
       const [theme,   setTheme]           = useState(loadStr(THEME_KEY, 'system'));
       const [reminderDow, setReminderDow] = useState(loadStr(REMIND_KEY, ''));
 
       // UI
       const [tab, setTab]                 = useState('home');
+      const [tabSlideDir, setTabSlideDir]   = useState(0);
       const [showWizard, setShowWizard]   = useState(false);
       const [result, setResult]           = useState(null);
       const [toast, setToast]             = useState(null);
@@ -6087,6 +6356,115 @@
 
       const fileRef       = useRef(null);
       const bundleFileRef = useRef(null);
+      const shellMainRef  = useRef(null);
+
+      const goTab = useCallback((next) => {
+        if (next === tab) return;
+        const pi = MAIN_TAB_ORDER.indexOf(tab);
+        const ni = MAIN_TAB_ORDER.indexOf(next);
+        const dir = pi >= 0 && ni >= 0 && ni !== pi ? (ni > pi ? 1 : -1) : 0;
+        const reduceMotion =
+          typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const run = () => {
+          ReactDOM.flushSync(() => {
+            setTabSlideDir(dir);
+            setTab(next);
+          });
+          requestAnimationFrame(() => {
+            shellMainRef.current?.scrollTo(0, 0);
+          });
+        };
+
+        if (SUPPORTS_VIEW_TRANSITION && !reduceMotion) {
+          document.startViewTransition(run);
+        } else {
+          run();
+        }
+      }, [tab]);
+
+      useEffect(() => {
+        if (!activeProfile) return;
+        const el = shellMainRef.current;
+        if (!el) return;
+
+        const ignoredStart = (target) => {
+          if (!target || typeof target.closest !== 'function') return true;
+          return !!target.closest(
+            '.trend-chart-wrap, input, textarea, select, option'
+          );
+        };
+
+        let activePid = null;
+        let sx = 0;
+        let sy = 0;
+        let st = 0;
+
+        let onWinUp = null;
+        let onWinCancel = null;
+
+        const cleanupWin = () => {
+          if (onWinUp) {
+            window.removeEventListener('pointerup', onWinUp);
+            window.removeEventListener('pointercancel', onWinCancel);
+            onWinUp = null;
+            onWinCancel = null;
+          }
+        };
+
+        const finishSwipe = (e) => {
+          if (!e.isPrimary || e.pointerId !== activePid) return;
+          activePid = null;
+          cleanupWin();
+
+          if (showWizard || result || showProfileMgr) return;
+          const dt = Date.now() - st;
+          const dx = e.clientX - sx;
+          const dy = e.clientY - sy;
+          if (dt > SWIPE_TAB_MAX_MS) return;
+          if (Math.abs(dx) < SWIPE_TAB_MIN_PX) return;
+          if (Math.abs(dy) > Math.abs(dx) * 0.65) return;
+
+          const order = MAIN_TAB_ORDER;
+          const i = order.indexOf(tab);
+          if (i < 0) return;
+          if (dx < 0) {
+            if (i < order.length - 1) goTab(order[i + 1]);
+          } else if (i > 0) {
+            goTab(order[i - 1]);
+          }
+        };
+
+        const onDown = (e) => {
+          if (!e.isPrimary) return;
+          if (activePid != null) return;
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          if (ignoredStart(e.target)) return;
+
+          activePid = e.pointerId;
+          sx = e.clientX;
+          sy = e.clientY;
+          st = Date.now();
+
+          onWinUp = (ev) => finishSwipe(ev);
+          onWinCancel = (ev) => {
+            if (ev.pointerId !== activePid) return;
+            activePid = null;
+            cleanupWin();
+          };
+          window.addEventListener('pointerup', onWinUp, { passive: true });
+          window.addEventListener('pointercancel', onWinCancel, { passive: true });
+        };
+
+        el.addEventListener('pointerdown', onDown, { passive: true });
+
+        return () => {
+          el.removeEventListener('pointerdown', onDown);
+          cleanupWin();
+          activePid = null;
+        };
+      }, [activeProfile, tab, goTab, showWizard, result, showProfileMgr]);
 
       // Persistence
       useEffect(() => saveHistory(history), [history]);
@@ -6261,7 +6639,7 @@
 
       const handleDismissResult = () => {
         setResult(null);
-        setTab('home');
+        goTab('home');
       };
 
       const clearAll = () => {
@@ -6318,6 +6696,8 @@
               throw new Error('Missing keys');
             }
             saveBundle(parsed);
+            saveBundleSourceMeta({ kind: 'file', filename: f.name });
+            setBundleSourceMeta({ kind: 'file', filename: f.name });
             setBundle(parsed);
             setToast('Trained model loaded');
           } catch {
@@ -6330,6 +6710,8 @@
 
       const clearBundle = () => {
         saveBundle(null);
+        saveBundleSourceMeta(null);
+        setBundleSourceMeta(null);
         setBundle(null);
         setToast('Reverted to heuristic scoring');
       };
@@ -6361,7 +6743,7 @@
       const wipeEverything = () => {
         try {
           [STORAGE_KEY, STORAGE_KEY_V1, THEME_KEY, REMIND_KEY,
-           BUNDLE_KEY, PROFILES_KEY, ACTIVE_KEY, TRACKER_KEY, LEGACY_PERSON]
+           BUNDLE_KEY, BUNDLE_SOURCE_META_KEY, PROFILES_KEY, ACTIVE_KEY, TRACKER_KEY, LEGACY_PERSON]
             .forEach(k => localStorage.removeItem(k));
           sessionStorage.clear();
         } catch {}
@@ -6399,10 +6781,10 @@
             setToast(`Sign in as ${p.name} to drill in`);
           } else {
             setActiveId(p.id);
-            setTab('insights');
+            goTab('insights');
           }
         } else {
-          setTab('insights');
+          goTab('insights');
         }
       };
 
@@ -6473,6 +6855,14 @@
         ),
       };
 
+      const tabPaneClass =
+        'tab-page vt-root'
+        + (SUPPORTS_VIEW_TRANSITION
+            ? ''
+            : ` tab-fallback tab-dir-${
+                tabSlideDir > 0 ? 'fwd' : tabSlideDir < 0 ? 'back' : 'neutral'
+              }`);
+
       // Header is intentionally minimal in the new design — the screen
       // content carries its own eyebrow + display title.
       const headerTitle = '';
@@ -6494,7 +6884,7 @@
               <div className="app-header-right">
                 {tab !== 'profile' && (
                   <button className="icon-btn" aria-label="Profile"
-                          onClick={() => setTab('profile')}>
+                          onClick={() => goTab('profile')}>
                     <Avatar name={activeProfile.name}
                             color={activeProfile.color} size="sm" />
                   </button>
@@ -6502,16 +6892,16 @@
               </div>
             </div>
 
-            <div className="app-main">
+            <div className="app-main" ref={shellMainRef}>
+              <div className={tabPaneClass} key={tab}>
               {tab === 'home' && (
                 <HomeTab
                   activeProfile={activeProfile}
                   personHist={personHist}
                   stats={stats}
                   onStartCheckin={startCheckin}
-                  onGoDashboard={() => setTab('insights')}
-                  onGoTracker={() => setTab('tracker')}
-                  onManageProfiles={() => setShowProfileMgr(true)}
+                  onGoDashboard={() => goTab('insights')}
+                  onGoTracker={() => goTab('tracker')}
                 />
               )}
               {tab === 'insights' && (
@@ -6539,6 +6929,7 @@
                   reminderDow={reminderDow}
                   requestReminder={requestReminder}
                   bundle={bundle}
+                  engineSource={engineSource}
                   onLoadBundle={handleBundleClick}
                   onClearBundle={clearBundle}
                   onExport={handleExport}
@@ -6548,20 +6939,26 @@
                   onClearAll={clearAll}
                 />
               )}
+              </div>
             </div>
+          </div>
 
-            <div className="tabbar">
-              <button className={`tab ${tab === 'home' ? 'active' : ''}`}
-                      onClick={() => setTab('home')}>
+          <div className="tabbar-dock">
+            <nav className="tabbar" aria-label="Primary navigation">
+              <button type="button"
+                      className={`tab ${tab === 'home' ? 'active' : ''}`}
+                      onClick={() => goTab('home')}>
                 {tabIcons.home(tab === 'home')}
                 <span>Home</span>
               </button>
-              <button className={`tab ${tab === 'insights' ? 'active' : ''}`}
-                      onClick={() => setTab('insights')}>
+              <button type="button"
+                      className={`tab ${tab === 'insights' ? 'active' : ''}`}
+                      onClick={() => goTab('insights')}>
                 {tabIcons.insights(tab === 'insights')}
                 <span>Dashboard</span>
               </button>
-              <button className="tab has-fab"
+              <button type="button"
+                      className="tab has-fab"
                       onClick={startCheckin}
                       aria-label="New check-in">
                 <span className="fab">
@@ -6573,17 +6970,19 @@
                 </span>
                 <span>Check in</span>
               </button>
-              <button className={`tab ${tab === 'tracker' ? 'active' : ''}`}
-                      onClick={() => setTab('tracker')}>
+              <button type="button"
+                      className={`tab ${tab === 'tracker' ? 'active' : ''}`}
+                      onClick={() => goTab('tracker')}>
                 {tabIcons.tracker(tab === 'tracker')}
                 <span>Tracker</span>
               </button>
-              <button className={`tab ${tab === 'profile' ? 'active' : ''}`}
-                      onClick={() => setTab('profile')}>
+              <button type="button"
+                      className={`tab ${tab === 'profile' ? 'active' : ''}`}
+                      onClick={() => goTab('profile')}>
                 {tabIcons.profile(tab === 'profile')}
                 <span>Profile</span>
               </button>
-            </div>
+            </nav>
           </div>
 
           {showWizard && (
@@ -6596,7 +6995,8 @@
           )}
 
           {result && (
-            <ResultScreen result={result} onDismiss={handleDismissResult} />
+            <ResultScreen result={result} engineSource={engineSource}
+                          onDismiss={handleDismissResult} />
           )}
 
           {showProfileMgr && (
