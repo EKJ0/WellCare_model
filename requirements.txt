@@ -1,0 +1,9 @@
+# Burnout-risk model — Python dependencies
+#
+# Tested against Python 3.10+. Both numpy and pandas are deliberately
+# loose because the code only uses long-stable APIs (ndarray ops,
+# DataFrame.groupby/transform/rolling, polyfit). If you pin tightly,
+# do it in a downstream environment file.
+
+numpy>=1.24,<3
+pandas>=2.0,<3

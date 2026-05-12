@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-05-10T20:29:46",
+  "label": "q",
+  "inputs": {
+    "hours": 40.0,
+    "sleep": 6.0,
+    "mood": 9.0,
+    "stress": 3.0,
+    "mgr_support": 3.0,
+    "peer_support": 3.0,
+    "deadline_pressure": 7.0,
+    "on_call_load": 1.0
+  },
+  "burnout_risk_percent": 12.42,
+  "verdict": "TYPICAL",
+  "scores": {
+    "logreg": 0.1136,
+    "gbt_raw": 0.122,
+    "gbt_calibrated": 0.1348,
+    "ensemble_mean": 0.1242
+  }
+}

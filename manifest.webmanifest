@@ -1,0 +1,26 @@
+{
+  "name": "Burnout Check-in",
+  "short_name": "Check-in",
+  "description": "Weekly burnout-risk check-in. Local-first, no account.",
+  "start_url": "checkin-app.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF8F4",
+  "theme_color": "#3F6B3A",
+  "categories": ["health", "productivity", "lifestyle"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='38' fill='%233F6B3A'/><path d='M40 110 L78 138 L152 60' stroke='white' stroke-width='14' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='102' fill='%233F6B3A'/><path d='M105 290 L208 366 L405 158' stroke='white' stroke-width='38' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

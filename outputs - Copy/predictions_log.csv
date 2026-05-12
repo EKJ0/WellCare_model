@@ -1,0 +1,2 @@
+timestamp,label,burnout_risk_percent,verdict,hours,sleep,mood,stress,mgr_support,peer_support,deadline_pressure,on_call_load,logreg,gbt_raw,gbt_calibrated
+2026-05-10T20:29:46,q,12.42,TYPICAL,40.0,6.0,9.0,3.0,3.0,3.0,7.0,1.0,0.1136,0.122,0.1348
