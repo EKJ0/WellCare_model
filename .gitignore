@@ -15,3 +15,8 @@
 .roo
 .trae
 .windsurf
+
+# Node and server artifacts
+node_modules/
+server/node_modules/
+server/data/

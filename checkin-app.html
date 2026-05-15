@@ -170,6 +170,20 @@
     .app-header-right {
       display: flex; align-items: center; gap: 6px;
     }
+    .notif-btn {
+      width: 40px; height: 40px; border-radius: 10px; border: none;
+      background: var(--surface-2); display:flex; align-items:center; justify-content:center;
+      position: relative; color: var(--text-muted);
+    }
+    .notif-badge {
+      position: absolute; top: -6px; right: -6px; background: var(--risk-high);
+      color: white; font-size: 11px; padding: 2px 6px; border-radius: 999px; font-weight:700;
+    }
+    .notif-panel {
+      position: absolute; right: 12px; top: 64px; width: 320px; max-width: calc(100vw - 32px);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+      box-shadow: var(--shadow-lg); z-index: 120;
+    }
 
     .app-main {
       flex: 1 1 auto;
@@ -3462,6 +3476,59 @@
       } catch {}
     }
 
+    // --- Connections & Notifications (client-only prototype storage) ---
+    const CONNECTIONS_KEY = 'wellcare_connections_v1';
+    const NOTIFS_KEY = 'wellcare_notifications_v1';
+
+    function loadConnections() { return loadJson(CONNECTIONS_KEY, []); }
+    function saveConnections(v) { saveJson(CONNECTIONS_KEY, v || []); }
+
+    async function createInviteToken(fromProfile) {
+      // Try server-issued token first, fallback to local base64 token when unavailable
+      try {
+        const resp = await fetch('/api/invite/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: { personId: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '' } }) });
+        if (resp.ok) { const j = await resp.json(); if (j && j.token) return j.token; }
+      } catch (e) { /* ignore, fallback below */ }
+      try {
+        const payload = { from: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '', ts: Date.now() };
+        return btoa(JSON.stringify(payload));
+      } catch { return ''; }
+    }
+
+    async function acceptInviteToken(token) {
+      // Try server accept endpoint first
+      try {
+        const resp = await fetch('/api/invite/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+        if (resp.ok) {
+          const j = await resp.json();
+          if (j && j.connection) {
+            const rec = { id: j.connection.id || (`${j.connection.personId}-${Math.floor(Math.random()*100000)}`), personId: j.connection.personId || j.connection.personId, name: j.connection.name || j.connection.personId, status: 'accepted', relationship: j.connection.relationship || 'Friend', alertThreshold: j.connection.alertThreshold || 0.75, share: j.connection.share || { risk: true, trend: true, last_checkin: true }, created_at: Date.now() };
+            const conns = loadConnections(); conns.push(rec); saveConnections(conns); pushNotification(`${rec.name} joined your Care Circle`); return rec;
+          }
+        }
+      } catch (e) { /* continue to local fallback */ }
+      try {
+        const json = atob((token||'').trim());
+        const obj = JSON.parse(json);
+        const conns = loadConnections();
+        const id = `${obj.from}-${Math.floor(Math.random()*100000)}`;
+        const rec = { id, personId: obj.from, name: obj.name || obj.from, status: 'accepted', relationship: 'Friend', alertThreshold: 0.75, created_at: Date.now() };
+        conns.push(rec); saveConnections(conns);
+        pushNotification(`${rec.name} joined your Care Circle`);
+        return rec;
+      } catch (e) { throw new Error('invalid invite'); }
+    }
+
+    function loadNotifications() { return loadJson(NOTIFS_KEY, []); }
+    function saveNotifications(a) { saveJson(NOTIFS_KEY, a || []); }
+    function pushNotification(text) {
+      const n = loadNotifications();
+      n.unshift({ id: 'n'+Date.now(), text, ts: Date.now(), read: false });
+      saveNotifications(n);
+      try { setToast(text); } catch {}
+    }
+    function dismissNotification(id) { const n = loadNotifications().filter(x => x.id !== id); saveNotifications(n); }
+
     /** Human-visible description of where the active scoring bundle comes from. */
     function bundleSourceDisplay(bundle, meta) {
       if (!bundle) {
@@ -4348,7 +4415,7 @@
         q: 'How supported by your manager today?',
         loEnd: 'low', hiEnd: 'strong' },
       { id: 'peer_support', kind: 'slider',
-        q: 'How supported by your team today?',
+        q: 'How supported by your care circle today?',
         loEnd: 'low', hiEnd: 'strong' },
       { id: 'feeling', kind: 'feeling',
         q: 'Right now, how are you holding up?',
@@ -5950,8 +6017,8 @@
       );
     }
 
-    /* =========================================================
-       TAB CONTENT — Team
+     /* =========================================================
+       TAB CONTENT — Care Circle
        ========================================================= */
     /* =========================================================
        TAB CONTENT — Daily Check-In
@@ -6030,11 +6097,13 @@
       }, [history]);
 
       const rows = useMemo(() => {
+        const conns = loadConnections();
         return profiles.map(p => {
           const latest = byPerson.get(p.personId) || null;
-          return { profile: p, latest };
+          const conn = conns.find(c => c.personId === p.personId || c.id === p.id) || null;
+          return { profile: p, latest, conn };
         }).filter(r => r.latest)
-          .sort((a, b) => b.latest.risk - a.latest.risk);
+          .sort((a, b) => (b.latest.risk - a.latest.risk));
       }, [profiles, byPerson]);
 
       if (profiles.length < 2 || rows.length === 0) {
@@ -6050,9 +6119,9 @@
                   <path d="M14 20c0-2 2-3.5 4-3.5s4 1.5 4 3.5"
                         stroke="currentColor" strokeWidth="1.4" />
                 </svg>
-                <div className="title">No team yet</div>
+                <div className="title">No Care Circle yet</div>
                 <div className="body">
-                  Add more profiles or import a multi-person CSV to see a team view.
+                  Add more connections or import a multi-person CSV to see your Care Circle.
                 </div>
               </div>
             </div>
@@ -6066,7 +6135,7 @@
       return (
         <div className="pane">
           <div className="home-hero">
-            <div className="eyebrow">Team latest</div>
+            <div className="eyebrow">Care Circle latest</div>
             <div className="pct">{(avg * 100).toFixed(0)}%</div>
             <div className="verdict">
               Average across {rows.length} {rows.length === 1 ? 'person' : 'people'}
@@ -6076,8 +6145,10 @@
 
           <div className="card">
             <div className="card-title">By person</div>
-            {rows.map(({ profile, latest }) => {
+            {rows.map(({ profile, latest, conn }) => {
+              const allowed = conn ? (conn.share || { risk: true, trend: true, last_checkin: true }) : { risk: true, trend: true, last_checkin: true };
               const v = verdict(latest.risk);
+              const showRisk = Boolean(allowed.risk);
               return (
                 <div key={profile.id} className="team-row"
                      onClick={() => onPickPerson(profile.id)}
@@ -6085,11 +6156,18 @@
                   <Avatar name={profile.name} color={profile.color} />
                   <div style={{ flex: 1 }}>
                     <div className="name">{profile.name}</div>
-                    <div className="meta">{shortDate(latest.when)}</div>
+                    <div className="meta">
+                      {allowed.last_checkin ? shortDate(latest.when) : 'Last updated: private'}
+                      <span style={{ marginLeft: 8, color: 'var(--text-soft)', fontSize: 13 }}>
+                        {conn && conn.relationship ? conn.relationship : (profile.relationship || 'Friend')}
+                        {' · '}
+                        Alert @ {( (conn && conn.alertThreshold ? conn.alertThreshold : profile.alertThreshold || 0.75) * 100).toFixed(0)}%
+                      </span>
+                    </div>
                   </div>
-                  <span className="mini-tag" style={{ color: v.color }}>{v.label}</span>
+                  <span className="mini-tag" style={{ color: v.color }}>{allowed.risk ? v.label : 'Private'}</span>
                   <span className="pct" style={{ color: v.color }}>
-                    {(latest.risk * 100).toFixed(0)}%
+                    {showRisk ? `${(latest.risk * 100).toFixed(0)}%` : '—'}
                   </span>
                 </div>
               );
@@ -6116,6 +6194,29 @@
     }) {
       const userCheckins = history.filter(
         e => e.person_id === activeProfile.personId).length;
+      const [inviteInput, setInviteInput] = useState('');
+
+      async function handleCreateInvite() {
+        try {
+          const token = await createInviteToken(activeProfile || { personId: 'me', name: 'Me' });
+          try { await navigator.clipboard.writeText(token); } catch {}
+          setToast('Invite copied to clipboard');
+        } catch { setToast('Could not create invite'); }
+      }
+
+      async function handleAcceptInvite() {
+        if (!inviteInput) { setToast('Paste an invite code first'); return; }
+        try {
+          const rec = await acceptInviteToken(inviteInput);
+          setInviteInput('');
+          setToast(`${rec.name} added to Care Circle`);
+        } catch (e) { setToast('Invalid invite code'); }
+      }
+
+      function updateConnection(id, patch) {
+        const cs = loadConnections().map(c => c.id === id ? { ...c, ...patch } : c);
+        saveConnections(cs); setToast('Saved');
+      }
       return (
         <div className="pane">
           <div className="eyebrow-pill">Account</div>
@@ -6229,6 +6330,67 @@
 
           <div className="panel">
             <div className="panel-head">
+              <div className="panel-title">Care Circle</div>
+            </div>
+            <div style={{ paddingTop: 8, display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="action-row" onClick={handleCreateInvite}>
+                  <span>Create invite (copy)</span>
+                </button>
+                <input className="text-input" placeholder="Paste invite code here"
+                       value={inviteInput} onChange={e => setInviteInput(e.target.value)} />
+                <button className="cta" style={{ padding: '8px 12px' }} onClick={handleAcceptInvite}>Accept</button>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Your connections</div>
+                {loadConnections().length === 0 && (
+                  <div style={{ color: 'var(--text-soft)' }}>No connections yet — create or accept an invite.</div>
+                )}
+                {loadConnections().map(c => (
+                  <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 8, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700 }}>{c.name}</div>
+                      <div style={{ color: 'var(--text-soft)', fontSize: 13 }}>{c.personId}</div>
+                    </div>
+                    <div style={{ width: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <select className="text-input" value={c.relationship || 'Friend'} onChange={e => updateConnection(c.id, { relationship: e.target.value })}>
+                        <option>Friend</option>
+                        <option>Partner</option>
+                        <option>Family</option>
+                        <option>Coach</option>
+                      </select>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input type="range" min="0" max="1" step="0.01" value={c.alertThreshold || 0.75}
+                               onChange={e => updateConnection(c.id, { alertThreshold: parseFloat(e.target.value) })} />
+                        <div style={{ width: 48, textAlign: 'right' }}>{Math.round((c.alertThreshold || 0.75)*100)}%</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={(c.share && c.share.risk) ?? true}
+                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), risk: e.target.checked } })} />
+                          Share risk %
+                        </label>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={(c.share && c.share.trend) ?? true}
+                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), trend: e.target.checked } })} />
+                          Share trend
+                        </label>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={(c.share && c.share.last_checkin) ?? true}
+                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), last_checkin: e.target.checked } })} />
+                          Share last update
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
               <div className="panel-title">Data</div>
             </div>
             <EngineSourceStrip info={DATA_FILES_HELP} compact />
@@ -6294,12 +6456,12 @@
     const TABS = [
       { id: 'home',     label: 'Home' },
       { id: 'insights', label: 'Insights' },
-      { id: 'team',     label: 'Team' },
+      { id: 'team',     label: 'Care Circle' },
       { id: 'profile',  label: 'Profile' },
     ];
 
     /** Tab bar order — used for subtle slide direction on change */
-    const MAIN_TAB_ORDER = ['home', 'insights', 'tracker', 'profile'];
+    const MAIN_TAB_ORDER = ['home', 'insights', 'team', 'tracker', 'profile'];
     const SUPPORTS_VIEW_TRANSITION =
       typeof document !== 'undefined'
       && typeof document.startViewTransition === 'function';
@@ -6335,6 +6497,7 @@
       const [showWizard, setShowWizard]   = useState(false);
       const [result, setResult]           = useState(null);
       const [toast, setToast]             = useState(null);
+      const [showNotifPanel, setShowNotifPanel] = useState(false);
       const [showProfileMgr, setShowProfileMgr] = useState(false);
 
       // Daily tracker — keyed by the active profile + today's date.
@@ -6882,6 +7045,37 @@
             <div className="app-header">
               <div />
               <div className="app-header-right">
+                <div style={{ position: 'relative' }}>
+                  <button className="notif-btn" aria-label="Notifications"
+                          onClick={() => setShowNotifPanel(s => !s)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18.6 14.6V11a6 6 0 1 0-12 0v3.6c0 .538-.214 1.055-.595 1.595L4 17h5"
+                            stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {loadNotifications().length > 0 && (
+                      <span className="notif-badge">{loadNotifications().length}</span>
+                    )}
+                  </button>
+                  {showNotifPanel && (
+                    <div className="notif-panel">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700 }}>Notifications</div>
+                        <button className="icon-btn" onClick={() => { saveNotifications([]); setShowNotifPanel(false); }}>Clear</button>
+                      </div>
+                      {loadNotifications().length === 0 && (
+                        <div style={{ color: 'var(--text-soft)' }}>No notifications</div>
+                      )}
+                      {loadNotifications().map(n => (
+                        <div key={n.id} style={{ padding: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontSize: 13 }}>{n.text}</div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="icon-btn" onClick={() => { dismissNotification(n.id); }} title="Dismiss">✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {tab !== 'profile' && (
                   <button className="icon-btn" aria-label="Profile"
                           onClick={() => goTab('profile')}>
@@ -6911,6 +7105,14 @@
                   insights={insights}
                   personId={activeProfile.personId}
                   activeProfile={activeProfile}
+                />
+              )}
+              {tab === 'team' && (
+                <TeamTab
+                  profiles={profiles}
+                  history={history}
+                  activeProfile={activeProfile}
+                  onPickPerson={onPickFromTeam}
                 />
               )}
               {tab === 'tracker' && (
@@ -6956,6 +7158,17 @@
                       onClick={() => goTab('insights')}>
                 {tabIcons.insights(tab === 'insights')}
                 <span>Dashboard</span>
+              </button>
+              <button type="button"
+                      className={`tab ${tab === 'team' ? 'active' : ''}`}
+                      onClick={() => goTab('team')}>
+                {/* simple people icon */}
+                <svg viewBox="0 0 24 24" fill="none">
+                  <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.6" />
+                  <circle cx="17" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+                </svg>
+                <span>Care Circle</span>
               </button>
               <button type="button"
                       className="tab has-fab"
