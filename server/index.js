@@ -6,7 +6,7 @@ require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.WELLCARE_SECRET || 'dev-secret-change-me';
-const DB_PATH = path.join(__dirname, 'data', 'db.json');
+const DB_PATH = process.env.WELLCARE_DB_PATH || path.join(__dirname, 'data', 'db.json');
 
 function ensureDb() {
   const dir = path.dirname(DB_PATH);
@@ -69,7 +69,26 @@ app.post('/api/invite/accept', (req, res) => {
 
   // mark invite accepted and create connection
   invite.status = 'accepted';
-  const conn = { id: crypto.randomUUID(), personId: payload.from, name: payload.name || payload.from, relationship: 'Friend', alertThreshold: 0.75, share: { risk: true, trend: true, last_checkin: true }, created_at: new Date().toISOString() };
+  const conn = {
+    id: crypto.randomUUID(),
+    personId: payload.from,
+    name: payload.name || payload.from,
+    relationship: 'Friend',
+    status: 'accepted',
+    alertThreshold: 0.75,
+    notificationEnabled: true,
+    share: {
+      risk: true,
+      level: true,
+      trend: true,
+      last_checkin: true,
+      top_contributors: false,
+      recovery_status: false,
+      private_answers: false,
+      notes: false,
+    },
+    created_at: new Date().toISOString(),
+  };
   db.connections.push(conn);
   writeDb(db);
 

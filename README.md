@@ -1,32 +1,38 @@
-# Burnout-Risk Model
+# WellCare Burnout-Risk Prototype
 
-A small, end-to-end burnout-risk prediction system you can run on your
-laptop. Models a team-week as 8 self-report signals + a few event flags,
-predicts a `Bernoulli(burnout)` probability, and ships a friendly
-check-in app for collecting real data.
+A student- and young-adult-focused burnout-risk check-in prototype you can run
+locally. The app tracks self-reported patterns related to stress, emotional
+overload, recovery, and trusted support. It is not a diagnostic or clinical
+tool.
 
-Everything is from-scratch numpy + a single-file React app. No sklearn,
-no torch, no backend. The whole thing trains in ~1 minute and the web
-app installs as a PWA on your phone.
+The current app is intentionally still a standalone single-file React PWA
+(`checkin-app.html`) for university demo speed. Longer term, migrate it to a
+Vite/React app with `src/components`, `src/screens`, `src/lib`, `src/model`,
+`src/storage`, and `src/styles`.
 
 ---
 
-Changes I made (quick dev notes):
+Current product direction:
 
-- Archived the simple JSX mock: `archive/checkin-app.jsx` (moved from root).
-- Renamed visible "Team" wording to "Care Circle" in `checkin-app.html`.
-  - Updated tab label, empty-state text, and question wording for clarity.
-- Left all application logic intact; these are UI copy and small UX updates
-  to match the new product direction (Care Circle / Connections).
+- Keep `checkin-app.html` as the main working demo app for now.
+- `archive/checkin-app.jsx` is an archived simple mock and should not be used
+  as the source of truth.
+- The former Team concept is now Care Circle: trusted people, connection
+  invites, per-connection alert thresholds, shared tracker privacy settings,
+  and in-app notifications.
+- Default sharing is limited to burnout risk percentage, risk level, trend, and
+  last check-in time. Private answers, notes, exact habit details, and sensitive
+  explanations stay hidden unless explicitly enabled later.
 
-Next recommended steps (short):
+Next recommended steps:
 
-1. Decide app architecture: keep the single-file PWA for demos or migrate
-   `checkin-app.html` into a proper React/Vite `src/` structure.
-2. Add a Connections / Care Circle screen backed by a user account model
-   and database tables (see `database/schema_wellcare.sql` for starting ideas).
-3. Implement invite/accept flows and an in-app notification center before
-   enabling push notifications.
+1. Keep the standalone PWA for the next demo, then migrate to React/Vite when
+   the screen flows stabilize.
+2. Replace prototype localStorage sync with authenticated cloud storage for
+   users, check-ins, connections, shared tracker settings, notifications, alert
+   thresholds, and alert history.
+3. Add app-level tests for scoring, context-aware habit modifiers, privacy
+   boundaries, alert thresholds, and notification cooldowns.
 
 
 ## Quick start
@@ -65,7 +71,7 @@ WellCare_model/
     ├── train.py                  # train on synthetic data
     ├── tune_gbt.py               # hyperparameter sweep
     ├── cv.py                     # 5-fold time-series cross-validation
-    ├── inspect_model.py          # feature importance + top-20 risky team-weeks
+    ├── inspect_model.py          # feature importance + top risky synthetic rows
     ├── threshold_tuning.py       # precision/recall at K — pick an action threshold
     ├── calibration_plot.py       # reliability diagram (ASCII + SVG)
     │
@@ -87,7 +93,7 @@ WellCare_model/
         ├── metrics.json          # test ROC-AUC / PR-AUC / Brier
         ├── feature_importance.csv
         ├── synthetic_data.csv
-        ├── scored_teams.csv
+        ├── scored_people.csv / scored_teams.csv
         └── tune_results.csv
 ```
 
@@ -95,9 +101,9 @@ WellCare_model/
 
 ## The model in one paragraph
 
-A latent "burnout reservoir" `R_t` accumulates pressure (long hours, high
-stress, deadline pressure, low mood) minus recovery (sleep, manager
-support, peer support, recent PTO). The label is sampled from
+A latent "burnout reservoir" `R_t` accumulates pressure (heavy study/workload
+hours, high stress, exam or assignment pressure, low mood) minus recovery
+(sleep, supportive connection, peer support, recent recovery days). The label is sampled from
 `Bernoulli(sigmoid(R_t - 1.6))`, giving roughly a 12% positive rate.
 The model has to recover this from noisy signals + 4w/12w rolling means
 + engineered features (deltas, volatility, slopes, event-recency
@@ -120,13 +126,13 @@ python tune_gbt.py
 # 5-fold time-series cross-validation
 python cv.py
 
-# Pick an action threshold (e.g. "flag the top 10% of team-weeks")
+# Pick an action threshold (e.g. "flag the top 10% of high-risk check-ins")
 python threshold_tuning.py
 
 # Reliability diagram — does '30%' actually happen 30% of the time?
 python calibration_plot.py
 
-# See which teams scored highest, eyeball their signals
+# See which synthetic rows scored highest, eyeball their signals
 python inspect_model.py
 ```
 
@@ -164,7 +170,7 @@ This verifies the invite creation and accept flow and checks the file-backed JSO
 ### Option A — Use the web app
 
 Open `checkin-app.html` in any browser, install it as a PWA on your
-phone (menu → "Add to Home Screen" on mobile), check in weekly, then
+phone (menu → "Add to Home Screen" on mobile), check in daily or weekly, then
 export the CSV from the menu. The export schema matches what the
 Python pipeline expects.
 
@@ -172,19 +178,19 @@ Python pipeline expects.
 
 ```powershell
 cd "outputs - Copy"
-python checkin.py --predict     # weekly: takes 30 seconds
+python checkin.py --predict     # quick pulse: takes 30 seconds
 ```
 
 Either way, when you have ≥80 rows + ≥10 positive labels:
 
 ```powershell
 python train_real.py                # train on real data alone
-python train_real.py --blend 60     # blend with 60 synthetic teams (low-data mode)
+python train_real.py --blend 60     # blend with synthetic rows (low-data mode)
 ```
 
 If you don't yet have 80 rows, start by reading `discovery.md` to find
-out what passive telemetry your org might already have available
-(calendar, Slack, GitHub, PagerDuty), and `survey_template.md` for the
+out what passive context data may be useful later
+(calendar load, deadlines, sleep/recovery logs), and `survey_template.md` for the
 exact wording of a 30-second weekly pulse.
 
 ---
@@ -226,19 +232,18 @@ edit to `scenarios.py` / `models.py` / `train.py`.
 4. **Tune it:** `python tune_gbt.py`, then update `train.py` with the
    winning config and re-run.
 5. **Make it predict on real data:** collect via `checkin.py` or the
-   web app for ~12 weeks (with at least a handful of people), then
+   web app for several weeks (with enough check-ins to calibrate), then
    `python train_real.py --blend 60`.
 6. **Decide what to act on:** `python threshold_tuning.py` to pick a
-   probability cutoff that matches your team's bandwidth for follow-up.
+   probability cutoff that matches your support bandwidth for follow-up.
 
 ---
 
 ## What this is and isn't
 
-- **It is** a self-reflection tool with a defensible model behind it,
-  intended for personal use or for managers wanting to spot teams under
-  sustained stress *before* anyone burns out.
-- **It is not** a clinical diagnostic, an HR surveillance tool, or
-  trained on real burnout data out of the box. Anyone making decisions
-  based on its outputs should run `calibration_plot.py` first to see
-  what its probabilities actually mean.
+- **It is** a self-reflection tool with a defensible prototype model behind it,
+  intended for personal wellbeing tracking and trusted Care Circle support.
+- **It is not** a diagnosis, an AI therapist, a mental illness score, an HR
+  surveillance tool, or a clinical risk system. Anyone making decisions based on
+  its outputs should run `calibration_plot.py` first to see what its
+  probabilities actually mean.

@@ -1117,6 +1117,16 @@
       background: var(--surface-2);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
+    .chip-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
 
     /* =========================================================
        INSIGHTS tab
@@ -1153,7 +1163,7 @@
     .empty .body  { font-size: 13.5px; line-height: 1.5; }
 
     /* =========================================================
-       TEAM tab
+       CARE CIRCLE tab
        ========================================================= */
     .team-row {
       display: flex; align-items: center; gap: 12px;
@@ -1170,6 +1180,44 @@
       font-variant-numeric: tabular-nums;
       font-weight: 700;
       font-size: 16px;
+    }
+    .team-row.paused { opacity: 0.62; }
+    .circle-detail-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .circle-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .circle-metric {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: var(--surface);
+    }
+    .circle-metric .k {
+      font-size: 11px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 4px;
+    }
+    .circle-metric .v {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .privacy-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--text-soft);
     }
 
     /* =========================================================
@@ -2828,6 +2876,12 @@
       if (trBad('workStudyPressure', ['High', 'Extreme'])) {
         domains.push({ key: 'tr_press', label: 'study/work pressure spiked today' });
       }
+      if (trBad('socialConnection', ['Draining', 'Isolated'])) {
+        domains.push({ key: 'tr_social', label: 'social connection felt draining or distant' });
+      }
+      if (trBad('recoveryTime', ['None'])) {
+        domains.push({ key: 'tr_recovery', label: 'there was no real recovery time today' });
+      }
 
       /* Dedupe by key */
       const domMap = new Map();
@@ -2918,9 +2972,13 @@
       const hydrationGood = tracker.hydration === 'Good';
       const movementGood = tracker.movement === 'Active';
       const breaksEnough = tracker.breaks === 'Enough';
+      const supportiveConnection = tracker.socialConnection === 'Supportive';
+      const realRest = tracker.recoveryTime === 'Real rest';
       if (hydrationGood) protective += 2;
       if (movementGood) protective += 3;
       if (breaksEnough) protective += 2;
+      if (supportiveConnection) protective += 3;
+      if (realRest) protective += 4;
 
       const protectCap = baseline >= 52 ? 10 : 16;
       baseline -= Math.min(protectCap, protective);
@@ -2968,6 +3026,12 @@
       if (poorSleep) topReasons.push('sleep has been short');
       if (workloadIntensity >= 0.5 || deadline >= 8) topReasons.push('workload pressure is high');
       if (overwhelmBool) topReasons.push('overwhelm is present');
+      if (tracker.screenTime === 'Avoidance' || tracker.screenTime === 'Late-night') {
+        topReasons.push('screen time may be avoidance or affecting recovery');
+      }
+      if (tracker.alcohol === 'To cope' || tracker.alcohol === 'Affected sleep') {
+        topReasons.push('alcohol may be coping-related or affecting sleep');
+      }
 
       for (const hr of histReasons) {
         if (!topReasons.includes(hr)) topReasons.push(hr);
@@ -3198,37 +3262,37 @@
       const cols = bundle.feature_cols;
       const xStd = scoreOutput.xStd;
       const PRETTY = {
-        hours: "Hours today", sleep: "Sleep last night",
+        hours: "Study/workload hours today", sleep: "Sleep last night",
         mood: "Mood", stress: "Stress",
-        mgr_support: "Manager support", peer_support: "Peer support",
-        deadline_pressure: "Workload pressure", on_call_load: "On-call load",
+        mgr_support: "Support figure", peer_support: "Peer/social support",
+        deadline_pressure: "Exam/assignment pressure", on_call_load: "Urgent obligations",
         // Daily-bundle features
-        hours_ma7:  "Hours (7-day avg)",  hours_ma28: "Hours (28-day avg)",
+        hours_ma7:  "Study/work hours (7-day avg)",  hours_ma28: "Study/work hours (28-day avg)",
         stress_ma7: "Stress (7-day avg)", stress_ma28: "Stress (28-day avg)",
         sleep_ma7:  "Sleep (7-day avg)",  sleep_ma28: "Sleep (28-day avg)",
         mood_ma7:   "Mood (7-day avg)",   mood_ma28:   "Mood (28-day avg)",
-        hours_delta7: "Hours vs 7-day avg",
+        hours_delta7: "Study/work hours vs 7-day avg",
         stress_delta7: "Stress vs 7-day avg",
         sleep_delta7:  "Sleep vs 7-day avg",
         mood_delta7:   "Mood vs 7-day avg",
-        deadline_pressure_delta7: "Workload vs 7-day avg",
-        hours_std7:  "Hours volatility",
+        deadline_pressure_delta7: "Exam/assignment pressure vs 7-day avg",
+        hours_std7:  "Study/work hours volatility",
         stress_std7: "Stress volatility",
-        hours_slope7: "Hours trend",
+        hours_slope7: "Study/work hours trend",
         stress_slope7: "Stress trend",
-        had_layoff_14d:   "Recent layoff",
-        had_reorg_14d:    "Recent reorg",
-        had_deadline_14d: "Recent deadline crunch",
-        days_since_pto: "Days since PTO",
+        had_layoff_14d:   "Recent major disruption",
+        had_reorg_14d:    "Recent life change",
+        had_deadline_14d: "Recent exam/deadline crunch",
+        days_since_pto: "Days since recovery day",
         // Legacy weekly bundle features (kept so older bundles still label)
-        hours_ma4: "Hours (4-week avg)",  hours_ma12: "Hours (12-week avg)",
+        hours_ma4: "Study/work hours (4-week avg)",  hours_ma12: "Study/work hours (12-week avg)",
         stress_ma4: "Stress (4-week avg)", stress_ma12: "Stress (12-week avg)",
         sleep_ma4: "Sleep (4-week avg)",  sleep_ma12: "Sleep (12-week avg)",
         mood_ma4: "Mood (4-week avg)",    mood_ma12: "Mood (12-week avg)",
-        had_layoff_4w: "Recent layoff",   had_reorg_4w: "Recent reorg",
-        had_deadline_4w: "Recent deadline crunch",
-        weeks_since_pto: "Weeks since PTO",
-        hours_x_stress: "Hours × stress",
+        had_layoff_4w: "Recent major disruption",   had_reorg_4w: "Recent life change",
+        had_deadline_4w: "Recent exam/deadline crunch",
+        weeks_since_pto: "Weeks since recovery day",
+        hours_x_stress: "Workload hours × stress",
         low_sleep_high_hours: "Low-sleep + high-hours combo",
       };
       const contribs = w.map((wi, i) => ({
@@ -3242,20 +3306,20 @@
     function heuristicDrivers(s, events) {
       const E = events instanceof Set ? events : new Set(events || []);
       const items = [
-        { key: 'hours',             label: 'Long hours',           c:  (s.hours - 40) / 12 },
+        { key: 'hours',             label: 'Heavy study/workload hours', c:  (s.hours - 40) / 12 },
         { key: 'sleep',             label: 'Low sleep',            c: -(s.sleep - 6) / 2 * 0.6 },
         { key: 'stress',            label: 'High stress',          c:  (s.stress - 5) / 3 },
         { key: 'mood',              label: 'Low mood',             c: -(s.mood - 6) / 4 },
-        { key: 'deadline_pressure', label: 'Deadline pressure',    c:  (s.deadline_pressure - 4) / 3 },
-        { key: 'mgr_support',       label: 'Manager support',      c: -(s.mgr_support - 6) / 4 * 0.6 },
-        { key: 'peer_support',      label: 'Peer support',         c: -(s.peer_support - 6) / 5 * 0.6 },
-        { key: 'on_call_load',      label: 'On-call load',         c:  0.5 * s.on_call_load },
+        { key: 'deadline_pressure', label: 'Exam/assignment pressure', c:  (s.deadline_pressure - 4) / 3 },
+        { key: 'mgr_support',       label: 'Support figure',       c: -(s.mgr_support - 6) / 4 * 0.6 },
+        { key: 'peer_support',      label: 'Peer/social support',   c: -(s.peer_support - 6) / 5 * 0.6 },
+        { key: 'on_call_load',      label: 'Urgent obligations',    c:  0.5 * s.on_call_load },
       ];
-      if (E.has('layoff'))          items.push({ key: 'ev_lay', label: 'Recent layoff',         c:  0.8 });
-      if (E.has('reorg'))           items.push({ key: 'ev_reo', label: 'Recent reorg',          c:  0.5 });
-      if (E.has('deadline_crunch')) items.push({ key: 'ev_dl',  label: 'Recent deadline crunch',c:  0.4 });
+      if (E.has('layoff'))          items.push({ key: 'ev_lay', label: 'Recent major disruption', c:  0.8 });
+      if (E.has('reorg'))           items.push({ key: 'ev_reo', label: 'Recent life change',    c:  0.5 });
+      if (E.has('deadline_crunch')) items.push({ key: 'ev_dl',  label: 'Recent exam/deadline crunch', c:  0.4 });
       if (E.has('personal_shock'))  items.push({ key: 'ev_ps',  label: 'Personal shock',        c:  0.5 });
-      if (E.has('pto'))             items.push({ key: 'ev_pto', label: 'Recent PTO',            c: -0.9 });
+      if (E.has('pto'))             items.push({ key: 'ev_pto', label: 'Recent recovery day',   c: -0.9 });
       if (E.has('recognition'))     items.push({ key: 'ev_rec', label: 'Recent recognition',    c: -0.3 });
       return items.filter(d => Math.abs(d.c) > 0.15)
                   .sort((a, b) => Math.abs(b.c) - Math.abs(a.c))
@@ -3350,15 +3414,17 @@
         title: 'Stress Load',
         cards: [
           { id: 'screenTime',        name: 'Screen Time',
-            opts: ['Low', 'Moderate', 'High', 'Very high'] },
+            opts: ['Relaxing', 'Connecting', 'Avoidance', 'Late-night'] },
           { id: 'caffeine',          name: 'Caffeine',
             opts: ['None', 'Low', 'Moderate', 'High'] },
           { id: 'workStudyPressure', name: 'Work / Study Pressure',
             opts: ['Low', 'Moderate', 'High', 'Extreme'] },
-          { id: 'socialExhaustion',  name: 'Social Exhaustion',
-            opts: ['None', 'Some', 'High'] },
+          { id: 'socialConnection',  name: 'Social Connection',
+            opts: ['Supportive', 'Neutral', 'Draining', 'Isolated'] },
+          { id: 'recoveryTime',      name: 'Recovery Time',
+            opts: ['Real rest', 'Some', 'None'] },
           { id: 'alcohol',           name: 'Alcohol', muted: true,
-            opts: ['None', 'Some', 'High'] },
+            opts: ['None', 'Connected', 'To cope', 'Affected sleep'] },
           { id: 'nicotine',          name: 'Nicotine', muted: true,
             opts: ['None', 'Some', 'High'] },
         ],
@@ -3376,11 +3442,12 @@
       hydration:         { Low: +0.015, Okay: 0, Good: -0.01 },
       movement:          { None: +0.015, Light: -0.01, Active: -0.025 },
       breaks:            { None: +0.02, Some: 0, Enough: -0.015 },
-      screenTime:        { Low: -0.01, Moderate: 0, High: +0.015, 'Very high': +0.03 },
+      screenTime:        { Relaxing: 0, Connecting: -0.01, Avoidance: +0.025, 'Late-night': +0.04 },
       caffeine:          { None: 0, Low: 0, Moderate: 0, High: +0.02 },
       workStudyPressure: { Low: -0.01, Moderate: 0, High: +0.025, Extreme: +0.05 },
-      socialExhaustion:  { None: 0, Some: +0.01, High: +0.03 },
-      alcohol:           { None: 0, Some: +0.01, High: +0.025 },
+      socialConnection:  { Supportive: -0.025, Neutral: 0, Draining: +0.025, Isolated: +0.035 },
+      recoveryTime:      { 'Real rest': -0.035, Some: -0.01, None: +0.035 },
+      alcohol:           { None: 0, Connected: -0.005, 'To cope': +0.035, 'Affected sleep': +0.045 },
       nicotine:          { None: 0, Some: +0.02, High: +0.04 },
     };
 
@@ -3479,9 +3546,43 @@
     // --- Connections & Notifications (client-only prototype storage) ---
     const CONNECTIONS_KEY = 'wellcare_connections_v1';
     const NOTIFS_KEY = 'wellcare_notifications_v1';
+    const ALERT_EVENTS_KEY = 'wellcare_alert_events_v1';
+    const DEFAULT_SHARE_SETTINGS = {
+      risk: true,
+      level: true,
+      trend: true,
+      last_checkin: true,
+      top_contributors: false,
+      recovery_status: false,
+      private_answers: false,
+      notes: false,
+    };
+    const ACCEPTED_CONNECTION_STATUSES = new Set(['accepted', 'active']);
 
-    function loadConnections() { return loadJson(CONNECTIONS_KEY, []); }
-    function saveConnections(v) { saveJson(CONNECTIONS_KEY, v || []); }
+    function normalizeShareSettings(share) {
+      return { ...DEFAULT_SHARE_SETTINGS, ...(share || {}) };
+    }
+    function normalizeConnection(c) {
+      const status = c.status === 'active' ? 'accepted' : (c.status || 'accepted');
+      return {
+        ...c,
+        status,
+        relationship: c.relationship || 'Friend',
+        alertThreshold: Number.isFinite(+c.alertThreshold) ? +c.alertThreshold : 0.75,
+        share: normalizeShareSettings(c.share),
+        notificationEnabled: c.notificationEnabled !== false,
+      };
+    }
+    function isAcceptedConnection(c) {
+      return ACCEPTED_CONNECTION_STATUSES.has((c.status || '').toLowerCase());
+    }
+    function loadConnections() {
+      return loadJson(CONNECTIONS_KEY, []).map(normalizeConnection);
+    }
+    function saveConnections(v) {
+      saveJson(CONNECTIONS_KEY, (v || []).map(normalizeConnection));
+      try { window.dispatchEvent(new CustomEvent('wellcare-connections-changed')); } catch {}
+    }
 
     async function createInviteToken(fromProfile) {
       // Try server-issued token first, fallback to local base64 token when unavailable
@@ -3502,7 +3603,16 @@
         if (resp.ok) {
           const j = await resp.json();
           if (j && j.connection) {
-            const rec = { id: j.connection.id || (`${j.connection.personId}-${Math.floor(Math.random()*100000)}`), personId: j.connection.personId || j.connection.personId, name: j.connection.name || j.connection.personId, status: 'accepted', relationship: j.connection.relationship || 'Friend', alertThreshold: j.connection.alertThreshold || 0.75, share: j.connection.share || { risk: true, trend: true, last_checkin: true }, created_at: Date.now() };
+            const rec = normalizeConnection({
+              id: j.connection.id || (`${j.connection.personId}-${Math.floor(Math.random()*100000)}`),
+              personId: j.connection.personId,
+              name: j.connection.name || j.connection.personId,
+              status: 'accepted',
+              relationship: j.connection.relationship || 'Friend',
+              alertThreshold: j.connection.alertThreshold || 0.75,
+              share: j.connection.share,
+              created_at: Date.now(),
+            });
             const conns = loadConnections(); conns.push(rec); saveConnections(conns); pushNotification(`${rec.name} joined your Care Circle`); return rec;
           }
         }
@@ -3512,7 +3622,7 @@
         const obj = JSON.parse(json);
         const conns = loadConnections();
         const id = `${obj.from}-${Math.floor(Math.random()*100000)}`;
-        const rec = { id, personId: obj.from, name: obj.name || obj.from, status: 'accepted', relationship: 'Friend', alertThreshold: 0.75, created_at: Date.now() };
+        const rec = normalizeConnection({ id, personId: obj.from, name: obj.name || obj.from, status: 'accepted', relationship: 'Friend', alertThreshold: 0.75, created_at: Date.now() });
         conns.push(rec); saveConnections(conns);
         pushNotification(`${rec.name} joined your Care Circle`);
         return rec;
@@ -3521,13 +3631,55 @@
 
     function loadNotifications() { return loadJson(NOTIFS_KEY, []); }
     function saveNotifications(a) { saveJson(NOTIFS_KEY, a || []); }
-    function pushNotification(text) {
+    function pushNotification(text, meta) {
       const n = loadNotifications();
-      n.unshift({ id: 'n'+Date.now(), text, ts: Date.now(), read: false });
+      const item = { id: 'n'+Date.now(), text, ts: Date.now(), read: false, ...(meta || {}) };
+      n.unshift(item);
       saveNotifications(n);
-      try { setToast(text); } catch {}
+      try { window.dispatchEvent(new CustomEvent('wellcare-notifications-changed')); } catch {}
+      return item;
     }
-    function dismissNotification(id) { const n = loadNotifications().filter(x => x.id !== id); saveNotifications(n); }
+    function dismissNotification(id) {
+      const n = loadNotifications().filter(x => x.id !== id);
+      saveNotifications(n);
+      try { window.dispatchEvent(new CustomEvent('wellcare-notifications-changed')); } catch {}
+    }
+    function loadAlertEvents() { return loadJson(ALERT_EVENTS_KEY, []); }
+    function saveAlertEvents(a) { saveJson(ALERT_EVENTS_KEY, a || []); }
+    function alertCooldownAllows(key, cooldownMs) {
+      const now = Date.now();
+      const events = loadAlertEvents().filter(e => now - (e.ts || 0) < cooldownMs);
+      const blocked = events.some(e => e.key === key);
+      if (!blocked) {
+        events.unshift({ key, ts: now });
+        saveAlertEvents(events.slice(0, 200));
+      } else {
+        saveAlertEvents(events);
+      }
+      return !blocked;
+    }
+    function notifyCareCircleForEntry(entry, previousHistory, activeProfile) {
+      const conns = loadConnections()
+        .filter(c => isAcceptedConnection(c) && c.notificationEnabled !== false)
+        .filter(c => c.personId === entry.person_id || c.name === activeProfile.name);
+      if (!conns.length) return;
+      const previous = (previousHistory || [])
+        .find(e => (e.person_id || 'me') === entry.person_id);
+      for (const c of conns) {
+        const threshold = c.alertThreshold || 0.75;
+        const crossed = entry.risk >= threshold && (!previous || previous.risk < threshold);
+        const rising = previous && entry.risk >= 0.55 && entry.risk - previous.risk >= 0.10;
+        if (!crossed && !rising) continue;
+        const kind = crossed ? 'threshold_crossed' : 'risk_rising';
+        const key = `${kind}:${c.id}:${new Date(entry.when).toISOString().slice(0,10)}`;
+        if (!alertCooldownAllows(key, 20 * 60 * 60 * 1000)) continue;
+        const pct = Math.round(entry.risk * 100);
+        const msg = crossed
+          ? `${activeProfile.name}'s burnout risk reached ${pct}%. A gentle check-in may help.`
+          : `${activeProfile.name}'s burnout risk is rising. A gentle check-in may help.`;
+        pushNotification(msg, { kind, personId: entry.person_id, connectionId: c.id });
+      }
+    }
 
     /** Human-visible description of where the active scoring bundle comes from. */
     function bundleSourceDisplay(bundle, meta) {
@@ -3745,12 +3897,12 @@
         const pastStress = personHist.slice(1).map(e => e.signals.stress);
         if (latest.signals.stress > Math.max(...pastStress)) {
           out.push({ kind: 'bad', text:
-            `Highest stress in ${personHist.length - 1} weeks of tracking.` });
+            `Highest stress in ${personHist.length - 1} recent check-ins.` });
         }
         const pastSleep = personHist.slice(1).map(e => e.signals.sleep);
         if (latest.signals.sleep < Math.min(...pastSleep)) {
           out.push({ kind: 'bad', text:
-            `Lowest sleep in ${personHist.length - 1} weeks.` });
+            `Lowest sleep in ${personHist.length - 1} recent check-ins.` });
         }
       }
 
@@ -3760,25 +3912,25 @@
         const delta = a - b;
         if (delta >= 0.10) {
           out.push({ kind: 'warn', text:
-            `Risk trending up: last 4 weeks averaged ${(a*100).toFixed(0)}%, ` +
+            `Risk trending up: last 4 check-ins averaged ${(a*100).toFixed(0)}%, ` +
             `previous 4 averaged ${(b*100).toFixed(0)}%.` });
         } else if (delta <= -0.10) {
           out.push({ kind: 'good', text:
-            `Risk trending down: last 4 weeks averaged ${(a*100).toFixed(0)}%, ` +
+            `Risk trending down: last 4 check-ins averaged ${(a*100).toFixed(0)}%, ` +
             `down from ${(b*100).toFixed(0)}%.` });
         }
       }
 
       const ptoIdx = personHist.findIndex(e => e.events.includes('pto'));
       if (ptoIdx >= 8) {
-        out.push({ kind: 'warn', text: `${ptoIdx}+ weeks since you logged PTO.` });
+        out.push({ kind: 'warn', text: `${ptoIdx}+ check-ins since you logged a recovery day.` });
       } else if (ptoIdx === -1 && personHist.length >= 8) {
-        out.push({ kind: 'warn', text: `No PTO logged in the last ${personHist.length} weeks.` });
+        out.push({ kind: 'warn', text: `No recovery day logged in the last ${personHist.length} check-ins.` });
       }
 
       if (out.length === 0 && personHist.length >= 4) {
         out.push({ kind: 'good', text:
-          `Steady week. Nothing unusual vs your last ${personHist.length - 1} weeks.` });
+          `Steady pattern. Nothing unusual vs your last ${personHist.length - 1} check-ins.` });
       }
       return out.slice(0, 4);
     }
@@ -3940,7 +4092,7 @@
     /* =========================================================
        Static config
        ========================================================= */
-    // Daily-scale defaults: `hours` is hours worked TODAY (0–16) and
+    // Daily-scale defaults: `hours` is study/workload hours TODAY (0–16) and
     // `sleep` is hours slept LAST NIGHT. The trained model expects
     // weekly hours, so we convert on the way into the scorer — see
     // signalsForModel().
@@ -4391,17 +4543,17 @@
        ========================================================= */
     const QUESTIONS = [
       { id: 'hours', kind: 'number',
-        q: 'How many hours did you work today?',
-        hint: 'Meetings, focus time, on-call — just today. 8 is a normal day.',
+        q: 'How many study, work, or obligation hours did you have today?',
+        hint: 'Classes, shifts, assignments, caregiving, commute — just today. 8 is a full day.',
         min: 0, max: 16, step: 0.5, unit: 'hours today' },
       { id: 'sleep', kind: 'number',
         q: 'How many hours did you sleep last night?',
         hint: '7 is a healthy night. Naps don\'t count.',
         min: 3, max: 11, step: 0.5, unit: 'hours last night' },
       { id: 'on_call_load', kind: 'segmented',
-        q: 'Are you on-call today?',
-        hint: 'How much are pages or rotations cutting into your day?',
-        options: [{ v: 0, l: 'No' }, { v: 0.6, l: 'A bit' }, { v: 1.2, l: 'Heavily' }] },
+        q: 'Did urgent obligations interrupt your day?',
+        hint: 'Unexpected tasks, family needs, group work, admin, or anything you had to react to.',
+        options: [{ v: 0, l: 'No' }, { v: 0.6, l: 'A bit' }, { v: 1.2, l: 'A lot' }] },
       { id: 'mood', kind: 'slider',
         q: 'How is your mood right now?',
         loEnd: 'low', hiEnd: 'high' },
@@ -4412,7 +4564,7 @@
         q: 'How heavy is today\'s workload?',
         loEnd: 'none', hiEnd: 'crushing' },
       { id: 'mgr_support', kind: 'slider',
-        q: 'How supported by your manager today?',
+        q: 'How supported by a teacher, mentor, or support figure today?',
         loEnd: 'low', hiEnd: 'strong' },
       { id: 'peer_support', kind: 'slider',
         q: 'How supported by your care circle today?',
@@ -5747,13 +5899,13 @@
       { id: 'sleep',             name: 'Sleep',
         pick: e => e.signals && +e.signals.sleep,
         min: 3, max: 11, unit: 'h',   loEnd: 'short', hiEnd: 'long',   direction: +1 },
-      { id: 'hours',             name: 'Work hours',
+      { id: 'hours',             name: 'Study/work hours',
         pick: e => e.signals && +e.signals.hours,
         min: 0, max: 16, unit: 'h',   loEnd: 'light', hiEnd: 'heavy',  direction: -1 },
-      { id: 'mgr_support',       name: 'Manager support',
+      { id: 'mgr_support',       name: 'Support figure',
         pick: e => e.signals && +e.signals.mgr_support,
         min: 1, max: 10, unit: '/10', loEnd: 'low',   hiEnd: 'strong', direction: +1 },
-      { id: 'peer_support',      name: 'Peer support',
+      { id: 'peer_support',      name: 'Peer/social support',
         pick: e => e.signals && +e.signals.peer_support,
         min: 1, max: 10, unit: '/10', loEnd: 'low',   hiEnd: 'strong', direction: +1 },
     ];
@@ -6084,44 +6236,179 @@
       );
     }
 
-    function TeamTab({ profiles, history, activeProfile, onPickPerson }) {
+    function TeamTab({ profiles, history, activeProfile }) {
+      const [connections, setConnections] = useState(() => loadConnections());
+      const [selectedId, setSelectedId] = useState('');
+
+      useEffect(() => {
+        const refresh = () => setConnections(loadConnections());
+        window.addEventListener('wellcare-connections-changed', refresh);
+        return () => window.removeEventListener('wellcare-connections-changed', refresh);
+      }, []);
+
       const byPerson = useMemo(() => {
         const map = new Map();
         for (const e of history) {
           const id = e.person_id || 'me';
-          if (!map.has(id) || new Date(map.get(id).when) < new Date(e.when)) {
-            map.set(id, e);
-          }
+          if (!map.has(id)) map.set(id, []);
+          map.get(id).push(e);
+        }
+        for (const list of map.values()) {
+          list.sort((a, b) => new Date(b.when) - new Date(a.when));
         }
         return map;
       }, [history]);
 
       const rows = useMemo(() => {
-        const conns = loadConnections();
-        return profiles.map(p => {
-          const latest = byPerson.get(p.personId) || null;
-          const conn = conns.find(c => c.personId === p.personId || c.id === p.id) || null;
-          return { profile: p, latest, conn };
-        }).filter(r => r.latest)
-          .sort((a, b) => (b.latest.risk - a.latest.risk));
-      }, [profiles, byPerson]);
+        const localProfileRows = profiles
+          .filter(p => p.id !== activeProfile.id)
+          .map(p => {
+            const existing = connections.find(c => c.personId === p.personId || c.name === p.name);
+            return normalizeConnection(existing || {
+              id: `local-${p.id}`,
+              personId: p.personId,
+              name: p.name,
+              relationship: p.relationship || 'Friend',
+              status: 'accepted',
+              color: p.color,
+              source: 'local-profile',
+            });
+          });
+        const merged = [...connections, ...localProfileRows];
+        const seen = new Set();
+        return merged
+          .filter(c => {
+            const key = c.personId || c.id;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .map(c => {
+            const hist = byPerson.get(c.personId) || [];
+            const latest = hist[0] || null;
+            return { conn: c, hist, latest };
+          })
+          .sort((a, b) => (b.latest?.risk || 0) - (a.latest?.risk || 0));
+      }, [profiles, activeProfile.id, connections, byPerson]);
 
-      if (profiles.length < 2 || rows.length === 0) {
+      const acceptedRows = rows.filter(r => isAcceptedConnection(r.conn));
+      const visibleRiskRows = acceptedRows.filter(r => r.latest && r.conn.share.risk);
+      const avg = visibleRiskRows.length
+        ? visibleRiskRows.reduce((s, r) => s + r.latest.risk, 0) / visibleRiskRows.length
+        : null;
+      const elevated = visibleRiskRows.filter(r => r.latest.risk >= 0.56).length;
+      const selected = rows.find(r => r.conn.id === selectedId) || null;
+
+      function updateConnection(id, patch) {
+        const current = loadConnections();
+        const next = current.map(c => c.id === id ? normalizeConnection({ ...c, ...patch }) : c);
+        saveConnections(next);
+        setConnections(next);
+      }
+
+      function trendFor(hist) {
+        if (!hist || hist.length < 2) return 'No trend yet';
+        const diff = hist[0].risk - hist[Math.min(hist.length - 1, 6)].risk;
+        if (diff > 0.06) return 'Rising';
+        if (diff < -0.06) return 'Improving';
+        return 'Stable';
+      }
+
+      function supportAction(risk, trend) {
+        if (!Number.isFinite(risk)) return 'Invite them to share a first check-in when they are ready.';
+        if (risk >= 0.76) return 'Reach out directly and offer specific help with one obligation today.';
+        if (risk >= 0.56) return 'Send a gentle check-in and ask what would make the next 24 hours easier.';
+        if (trend === 'Rising') return 'A low-pressure message may help before things build up.';
+        return 'Keep the connection warm; no alert is needed right now.';
+      }
+
+      if (selected) {
+        const { conn, hist, latest } = selected;
+        const allowed = normalizeShareSettings(conn.share);
+        const accepted = isAcceptedConnection(conn);
+        const v = latest ? verdict(latest.risk) : null;
+        const trend = allowed.trend ? trendFor(hist) : 'Private';
+        const chartData = hist.slice(0, 14).map(e => ({ date: e.when, risk: e.risk })).reverse();
+        const thresholdPct = Math.round((conn.alertThreshold || 0.75) * 100);
+
         return (
           <div className="pane">
-            <div className="card">
-              <div className="empty">
-                <svg width="60" height="60" viewBox="0 0 24 24" fill="none">
-                  <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.4" />
-                  <circle cx="17" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M3 20c0-3 3-5 6-5s6 2 6 5"
-                        stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M14 20c0-2 2-3.5 4-3.5s4 1.5 4 3.5"
-                        stroke="currentColor" strokeWidth="1.4" />
-                </svg>
-                <div className="title">No Care Circle yet</div>
-                <div className="body">
-                  Add more connections or import a multi-person CSV to see your Care Circle.
+            <button className="chip-btn" onClick={() => setSelectedId('')}>
+              ← Care Circle
+            </button>
+            <div className="panel">
+              <div className="circle-detail-head">
+                <Avatar name={conn.name} color={conn.color || colorFor(conn.name)} size="lg" />
+                <div style={{ flex: 1 }}>
+                  <div className="panel-title" style={{ fontSize: 22 }}>{conn.name}</div>
+                  <div className="panel-sub">
+                    {conn.relationship || 'Friend'} · {accepted ? 'Connected' : conn.status}
+                  </div>
+                </div>
+                {v && allowed.level && <span className="mini-tag" style={{ color: v.color }}>{v.label}</span>}
+              </div>
+
+              {!accepted ? (
+                <div className="helper">
+                  Tracker sharing starts after this connection is accepted.
+                </div>
+              ) : latest ? (
+                <>
+                  <RiskRing pct={allowed.risk ? latest.risk : 0} color={v.color}
+                            label={allowed.risk ? v.label : 'Private'} />
+                  <div className="circle-metric-grid">
+                    <div className="circle-metric">
+                      <div className="k">Burnout Risk</div>
+                      <div className="v">{allowed.risk ? `${Math.round(latest.risk * 100)}%` : 'Private'}</div>
+                    </div>
+                    <div className="circle-metric">
+                      <div className="k">Trend</div>
+                      <div className="v">{trend}</div>
+                    </div>
+                    <div className="circle-metric">
+                      <div className="k">Last Check-In</div>
+                      <div className="v">{allowed.last_checkin ? shortDate(latest.when) : 'Private'}</div>
+                    </div>
+                    <div className="circle-metric">
+                      <div className="k">Alert Threshold</div>
+                      <div className="v">{thresholdPct}%</div>
+                    </div>
+                  </div>
+                  {allowed.trend && (
+                    <div className="panel trend-card" style={{ marginTop: 12 }}>
+                      <div className="head-row"><div className="h">Shared Risk History</div></div>
+                      <TrendChart data={chartData} />
+                    </div>
+                  )}
+                  <div className="panel" style={{ marginTop: 12 }}>
+                    <div className="panel-title">Suggested support action</div>
+                    <div className="panel-sub">{supportAction(latest.risk, trend)}</div>
+                  </div>
+                </>
+              ) : (
+                <div className="helper">
+                  No shared check-ins yet. Once they check in, you will see only the tracker fields they allow.
+                </div>
+              )}
+
+              {!String(conn.id).startsWith('local-') && (
+                <div className="panel" style={{ marginTop: 12 }}>
+                  <div className="panel-title">Alert threshold</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                    <input type="range" min="0.45" max="0.95" step="0.01"
+                           value={conn.alertThreshold || 0.75}
+                           onChange={e => updateConnection(conn.id, { alertThreshold: parseFloat(e.target.value) })} />
+                    <strong style={{ minWidth: 44, textAlign: 'right' }}>{thresholdPct}%</strong>
+                  </div>
+                </div>
+              )}
+
+              <div className="panel" style={{ marginTop: 12 }}>
+                <div className="panel-title">Privacy boundary</div>
+                <div className="privacy-list">
+                  <div>Shared by default: risk percentage, risk level, trend, and last check-in time.</div>
+                  <div>Hidden by default: private answers, exact habit details, notes, and sensitive explanations.</div>
+                  <div>Top contributors: {allowed.top_contributors ? 'shared' : 'private'} · Recovery status: {allowed.recovery_status ? 'shared' : 'private'}</div>
                 </div>
               </div>
             </div>
@@ -6129,51 +6416,69 @@
         );
       }
 
-      const avg = rows.reduce((s, r) => s + r.latest.risk, 0) / rows.length;
-      const elevated = rows.filter(r => r.latest.risk >= 0.31).length;
-
       return (
         <div className="pane">
           <div className="home-hero">
             <div className="eyebrow">Care Circle latest</div>
-            <div className="pct">{(avg * 100).toFixed(0)}%</div>
+            <div className="pct">{avg == null ? '—' : `${(avg * 100).toFixed(0)}%`}</div>
             <div className="verdict">
-              Average across {rows.length} {rows.length === 1 ? 'person' : 'people'}
-              {elevated > 0 && ` · ${elevated} above baseline`}
+              {acceptedRows.length === 0
+                ? 'Trusted people you connect with will appear here'
+                : `${acceptedRows.length} connected ${acceptedRows.length === 1 ? 'person' : 'people'}${elevated > 0 ? ` · ${elevated} high risk` : ''}`}
             </div>
           </div>
 
           <div className="card">
-            <div className="card-title">By person</div>
-            {rows.map(({ profile, latest, conn }) => {
-              const allowed = conn ? (conn.share || { risk: true, trend: true, last_checkin: true }) : { risk: true, trend: true, last_checkin: true };
-              const v = verdict(latest.risk);
-              const showRisk = Boolean(allowed.risk);
+            <div className="card-title">Connections</div>
+            {rows.length === 0 && (
+              <div className="empty">
+                <svg width="60" height="60" viewBox="0 0 24 24" fill="none">
+                  <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.4" />
+                  <circle cx="17" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M3 20c0-3 3-5 6-5s6 2 6 5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M14 20c0-2 2-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" strokeWidth="1.4" />
+                </svg>
+                <div className="title">No Care Circle yet</div>
+                <div className="body">
+                  Create or accept an invite from Profile to connect trusted people.
+                </div>
+              </div>
+            )}
+            {rows.map(({ conn, hist, latest }) => {
+              const accepted = isAcceptedConnection(conn);
+              const allowed = normalizeShareSettings(conn.share);
+              const v = latest ? verdict(latest.risk) : null;
+              const trend = latest && allowed.trend ? trendFor(hist) : 'Waiting';
+              const showRisk = accepted && latest && allowed.risk;
               return (
-                <div key={profile.id} className="team-row"
-                     onClick={() => onPickPerson(profile.id)}
+                <div key={conn.id}
+                     className={`team-row ${accepted ? '' : 'paused'}`}
+                     onClick={() => setSelectedId(conn.id)}
                      style={{ cursor: 'pointer' }}>
-                  <Avatar name={profile.name} color={profile.color} />
+                  <Avatar name={conn.name} color={conn.color || colorFor(conn.name)} />
                   <div style={{ flex: 1 }}>
-                    <div className="name">{profile.name}</div>
+                    <div className="name">{conn.name}</div>
                     <div className="meta">
-                      {allowed.last_checkin ? shortDate(latest.when) : 'Last updated: private'}
-                      <span style={{ marginLeft: 8, color: 'var(--text-soft)', fontSize: 13 }}>
-                        {conn && conn.relationship ? conn.relationship : (profile.relationship || 'Friend')}
-                        {' · '}
-                        Alert @ {( (conn && conn.alertThreshold ? conn.alertThreshold : profile.alertThreshold || 0.75) * 100).toFixed(0)}%
-                      </span>
+                      {conn.relationship || 'Friend'} · {accepted ? 'Accepted' : conn.status}
+                      {' · '}
+                      {latest && allowed.last_checkin ? `Last updated ${shortDate(latest.when)}` : 'No shared check-in yet'}
+                      {' · '}
+                      Trend: {trend}
+                      {' · '}
+                      Alert me at {Math.round((conn.alertThreshold || 0.75) * 100)}%
+                      {' · '}
+                      Notifications {conn.notificationEnabled === false ? 'off' : 'on'}
                     </div>
                   </div>
-                  <span className="mini-tag" style={{ color: v.color }}>{allowed.risk ? v.label : 'Private'}</span>
-                  <span className="pct" style={{ color: v.color }}>
+                  {v && allowed.level && <span className="mini-tag" style={{ color: v.color }}>{v.label}</span>}
+                  <span className="pct" style={{ color: v ? v.color : 'var(--text-soft)' }}>
                     {showRisk ? `${(latest.risk * 100).toFixed(0)}%` : '—'}
                   </span>
                 </div>
               );
             })}
             <div className="helper">
-              All aggregates are computed in this browser. Nothing leaves the device.
+              Shared tracker view hides private answers and notes unless someone explicitly allows them.
             </div>
           </div>
         </div>
@@ -6222,7 +6527,7 @@
           <div className="eyebrow-pill">Account</div>
           <h1 className="display-title">Your Profile</h1>
           <div className="display-sub">
-            Tune the app to match how you work and back up your data.
+            Tune the app to match your life, study, work, and support network.
           </div>
 
           <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -6351,7 +6656,9 @@
                   <div key={c.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: 8, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700 }}>{c.name}</div>
-                      <div style={{ color: 'var(--text-soft)', fontSize: 13 }}>{c.personId}</div>
+                      <div style={{ color: 'var(--text-soft)', fontSize: 13 }}>
+                        {c.personId} · {c.status || 'accepted'}
+                      </div>
                     </div>
                     <div style={{ width: 220, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <select className="text-input" value={c.relationship || 'Friend'} onChange={e => updateConnection(c.id, { relationship: e.target.value })}>
@@ -6360,12 +6667,24 @@
                         <option>Family</option>
                         <option>Coach</option>
                       </select>
+                      <select className="text-input" value={c.status || 'accepted'} onChange={e => updateConnection(c.id, { status: e.target.value })}>
+                        <option value="pending">pending</option>
+                        <option value="accepted">accepted</option>
+                        <option value="declined">declined</option>
+                        <option value="paused">paused</option>
+                        <option value="blocked">blocked</option>
+                      </select>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <input type="range" min="0" max="1" step="0.01" value={c.alertThreshold || 0.75}
                                onChange={e => updateConnection(c.id, { alertThreshold: parseFloat(e.target.value) })} />
                         <div style={{ width: 48, textAlign: 'right' }}>{Math.round((c.alertThreshold || 0.75)*100)}%</div>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                      <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={c.notificationEnabled !== false}
+                                 onChange={e => updateConnection(c.id, { notificationEnabled: e.target.checked })} />
+                          Notifications
+                        </label>
                         <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input type="checkbox" checked={(c.share && c.share.risk) ?? true}
                                  onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), risk: e.target.checked } })} />
@@ -6380,6 +6699,16 @@
                           <input type="checkbox" checked={(c.share && c.share.last_checkin) ?? true}
                                  onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), last_checkin: e.target.checked } })} />
                           Share last update
+                        </label>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={(c.share && c.share.top_contributors) ?? false}
+                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), top_contributors: e.target.checked } })} />
+                          Share top contributors
+                        </label>
+                        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <input type="checkbox" checked={(c.share && c.share.recovery_status) ?? false}
+                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), recovery_status: e.target.checked } })} />
+                          Share recovery status
                         </label>
                       </div>
                     </div>
@@ -6443,8 +6772,9 @@
           </div>
 
           <div className="helper" style={{ textAlign: 'center', marginTop: 16 }}>
-            Self-reflection tool, not a medical diagnosis. Risk is computed
-            locally. Everything stays on this device until you export.
+            WellCare is not a diagnostic tool. It tracks self-reported patterns
+            related to stress, emotional overload, and burnout risk. Risk is
+            computed locally in this prototype.
           </div>
         </div>
       );
@@ -6498,6 +6828,7 @@
       const [result, setResult]           = useState(null);
       const [toast, setToast]             = useState(null);
       const [showNotifPanel, setShowNotifPanel] = useState(false);
+      const [notifications, setNotifications] = useState(() => loadNotifications());
       const [showProfileMgr, setShowProfileMgr] = useState(false);
 
       // Daily tracker — keyed by the active profile + today's date.
@@ -6651,6 +6982,12 @@
       }, [toast]);
 
       useEffect(() => {
+        const refresh = () => setNotifications(loadNotifications());
+        window.addEventListener('wellcare-notifications-changed', refresh);
+        return () => window.removeEventListener('wellcare-notifications-changed', refresh);
+      }, []);
+
+      useEffect(() => {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('sw.js').then(reg => {
             // Check for an updated SW every time the page loads, and
@@ -6787,6 +7124,8 @@
           feeling, notes,
           risk, verdict: v.label,
         };
+        notifyCareCircleForEntry(entry, history, activeProfile);
+        setNotifications(loadNotifications());
         setHistory(h => [entry, ...h].slice(0, 1000));
         setResult({
           entry, v, drivers,
@@ -6906,7 +7245,8 @@
       const wipeEverything = () => {
         try {
           [STORAGE_KEY, STORAGE_KEY_V1, THEME_KEY, REMIND_KEY,
-           BUNDLE_KEY, BUNDLE_SOURCE_META_KEY, PROFILES_KEY, ACTIVE_KEY, TRACKER_KEY, LEGACY_PERSON]
+           BUNDLE_KEY, BUNDLE_SOURCE_META_KEY, PROFILES_KEY, ACTIVE_KEY, TRACKER_KEY,
+           CONNECTIONS_KEY, NOTIFS_KEY, ALERT_EVENTS_KEY, LEGACY_PERSON]
             .forEach(k => localStorage.removeItem(k));
           sessionStorage.clear();
         } catch {}
@@ -7052,24 +7392,31 @@
                       <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18.6 14.6V11a6 6 0 1 0-12 0v3.6c0 .538-.214 1.055-.595 1.595L4 17h5"
                             stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    {loadNotifications().length > 0 && (
-                      <span className="notif-badge">{loadNotifications().length}</span>
+                    {notifications.length > 0 && (
+                      <span className="notif-badge">{notifications.length}</span>
                     )}
                   </button>
                   {showNotifPanel && (
                     <div className="notif-panel">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <div style={{ fontWeight: 700 }}>Notifications</div>
-                        <button className="icon-btn" onClick={() => { saveNotifications([]); setShowNotifPanel(false); }}>Clear</button>
+                        <button className="icon-btn" onClick={() => { saveNotifications([]); setNotifications([]); setShowNotifPanel(false); }}>Clear</button>
                       </div>
-                      {loadNotifications().length === 0 && (
+                      {notifications.length === 0 && (
                         <div style={{ color: 'var(--text-soft)' }}>No notifications</div>
                       )}
-                      {loadNotifications().map(n => (
+                      {notifications.map(n => (
                         <div key={n.id} style={{ padding: 8, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ fontSize: 13 }}>{n.text}</div>
+                          <div style={{ fontSize: 13 }}>
+                            <div>{n.text}</div>
+                            {n.ts && (
+                              <div style={{ color: 'var(--text-soft)', fontSize: 11, marginTop: 2 }}>
+                                {shortDate(new Date(n.ts).toISOString())}
+                              </div>
+                            )}
+                          </div>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="icon-btn" onClick={() => { dismissNotification(n.id); }} title="Dismiss">✕</button>
+                            <button className="icon-btn" onClick={() => { dismissNotification(n.id); }} title="Dismiss">×</button>
                           </div>
                         </div>
                       ))}

@@ -12,7 +12,7 @@
 // installs drop their stale shell. We also use a network-first
 // strategy for the HTML itself (see fetch handler) so even before
 // the new SW activates, the page contents update.
-const CACHE = 'wellcare-checkin-v3';
+const CACHE = 'wellcare-checkin-v4';
 const SHELL = [
   './checkin-app.html',
   './manifest.webmanifest',
