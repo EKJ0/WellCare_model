@@ -14,7 +14,15 @@ function ensureDb() {
   if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify({ invites: [], connections: [], notifications: [] }, null, 2));
 }
 
-function readDb() { ensureDb(); return JSON.parse(fs.readFileSync(DB_PATH, 'utf8')); }
+function readDb() {
+  ensureDb();
+  const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  if (!Array.isArray(db.invites)) db.invites = [];
+  if (!Array.isArray(db.connections)) db.connections = [];
+  if (!Array.isArray(db.notifications)) db.notifications = [];
+  if (!Array.isArray(db.checkins)) db.checkins = [];
+  return db;
+}
 function writeDb(obj) { fs.writeFileSync(DB_PATH, JSON.stringify(obj, null, 2)); }
 
 function makeToken(payload) {
@@ -94,6 +102,46 @@ app.post('/api/invite/accept', (req, res) => {
   writeDb(db);
 
   res.json({ connection: conn });
+});
+
+app.post('/api/checkins', (req, res) => {
+  const personId = String(req.body.personId || req.body.person_id || '').trim();
+  const entry = req.body.entry || {};
+  const when = entry.when || new Date().toISOString();
+  const risk = Number(entry.risk);
+  if (!personId) return res.status(400).json({ error: 'missing_person_id' });
+  if (!Number.isFinite(risk)) return res.status(400).json({ error: 'missing_risk' });
+
+  const shared = {
+    id: String(entry.id || `${personId}-${when}`),
+    person_id: personId,
+    name: req.body.name || entry.name || '',
+    when,
+    risk: Math.max(0, Math.min(1, risk)),
+    verdict: entry.verdict || '',
+    updated_at: new Date().toISOString(),
+  };
+
+  const db = readDb();
+  const idx = db.checkins.findIndex(x => x.id === shared.id || (x.person_id === personId && x.when === when));
+  if (idx >= 0) db.checkins[idx] = { ...db.checkins[idx], ...shared };
+  else db.checkins.push(shared);
+  db.checkins = db.checkins
+    .sort((a, b) => new Date(b.when) - new Date(a.when))
+    .slice(0, 1000);
+  writeDb(db);
+
+  res.json({ ok: true, checkin: shared });
+});
+
+app.get('/api/shared-tracker/:personId', (req, res) => {
+  const personId = String(req.params.personId || '').trim();
+  const db = readDb();
+  const rows = db.checkins
+    .filter(x => x.person_id === personId)
+    .sort((a, b) => new Date(b.when) - new Date(a.when))
+    .slice(0, 30);
+  res.json({ personId, checkins: rows });
 });
 
 app.get('/api/db', (req, res) => {

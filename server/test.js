@@ -58,6 +58,21 @@ async function run() {
     assert.ok(db.body.invites[0].accepted_at, 'accepted invite records accepted_at');
     assert.strictEqual(db.body.connections[0].personId, 'me');
 
+    const checkin = await request(port, { method: 'POST', path: '/api/checkins', headers: { 'Content-Type': 'application/json' } }, {
+      personId: 'me',
+      name: 'Me',
+      entry: { id: 'c1', when: '2026-05-18T10:00:00.000Z', risk: 0.72, verdict: 'High', notes: 'private note' },
+    });
+    assert.strictEqual(checkin.statusCode, 200, 'checkin sync should return 200');
+    assert.strictEqual(checkin.body.checkin.risk, 0.72);
+    assert.strictEqual(checkin.body.checkin.notes, undefined, 'shared checkin must not expose notes');
+
+    const shared = await request(port, { method: 'GET', path: '/api/shared-tracker/me' });
+    assert.strictEqual(shared.statusCode, 200, 'shared tracker should return 200');
+    assert.strictEqual(shared.body.checkins.length, 1);
+    assert.strictEqual(shared.body.checkins[0].person_id, 'me');
+    assert.strictEqual(shared.body.checkins[0].notes, undefined, 'shared tracker hides private notes');
+
     console.log('All server tests passed.');
   } finally {
     server.close();
