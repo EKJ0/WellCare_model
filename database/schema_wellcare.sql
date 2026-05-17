@@ -248,9 +248,24 @@ CREATE TABLE IF NOT EXISTS wellcare_connections (
   relationship            TEXT,
   alert_threshold         DOUBLE PRECISION DEFAULT 0.75,
 
-  share_json              JSONB NOT NULL DEFAULT '{}'::jsonb,
-  status                  TEXT DEFAULT 'active',
+  share_json              JSONB NOT NULL DEFAULT '{
+    "risk": true,
+    "level": true,
+    "trend": true,
+    "last_checkin": true,
+    "top_contributors": false,
+    "recovery_status": false,
+    "private_answers": false,
+    "notes": false
+  }'::jsonb,
+  notification_enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+  status                  TEXT DEFAULT 'accepted',
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wellcare_connections_status_ck
+    CHECK (status IN ('pending', 'accepted', 'declined', 'paused', 'blocked')),
+  CONSTRAINT wellcare_connections_threshold_ck
+    CHECK (alert_threshold >= 0.0 AND alert_threshold <= 1.0),
 
   CONSTRAINT wellcare_connections_unique_pair
     UNIQUE (owner_user_id, profile_person_id, connection_person_id),
@@ -274,7 +289,12 @@ CREATE TABLE IF NOT EXISTS wellcare_connection_invites (
   to_person_id            TEXT,
   status                  TEXT DEFAULT 'pending',
   expires_at              TIMESTAMPTZ,
+  accepted_at             TIMESTAMPTZ,
+  declined_at             TIMESTAMPTZ,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wellcare_invites_status_ck
+    CHECK (status IN ('pending', 'accepted', 'declined', 'expired', 'cancelled')),
 
   CONSTRAINT wellcare_invites_profile_fk
     FOREIGN KEY (owner_user_id, profile_person_id)
@@ -302,6 +322,37 @@ CREATE TABLE IF NOT EXISTS wellcare_notifications (
 
 CREATE INDEX IF NOT EXISTS wellcare_notifications_owner_idx
   ON wellcare_notifications (owner_user_id, profile_person_id);
+
+CREATE TABLE IF NOT EXISTS wellcare_alert_settings (
+  owner_user_id           UUID NOT NULL,
+  profile_person_id       TEXT NOT NULL,
+  connection_id           UUID,
+
+  threshold               DOUBLE PRECISION NOT NULL DEFAULT 0.75,
+  cooldown_minutes        INTEGER NOT NULL DEFAULT 720,
+  notify_on_rising        BOOLEAN NOT NULL DEFAULT TRUE,
+  notify_on_checkin       BOOLEAN NOT NULL DEFAULT FALSE,
+  paused_until            TIMESTAMPTZ,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  PRIMARY KEY (owner_user_id, profile_person_id, connection_id),
+
+  CONSTRAINT wellcare_alert_settings_threshold_ck
+    CHECK (threshold >= 0.0 AND threshold <= 1.0),
+  CONSTRAINT wellcare_alert_settings_cooldown_ck
+    CHECK (cooldown_minutes >= 0),
+  CONSTRAINT wellcare_alert_settings_profile_fk
+    FOREIGN KEY (owner_user_id, profile_person_id)
+    REFERENCES wellcare_profiles (owner_user_id, profile_person_id)
+    ON DELETE CASCADE,
+  CONSTRAINT wellcare_alert_settings_connection_fk
+    FOREIGN KEY (connection_id)
+    REFERENCES wellcare_connections (id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS wellcare_alert_settings_owner_idx
+  ON wellcare_alert_settings (owner_user_id, profile_person_id);
 
 CREATE TABLE IF NOT EXISTS wellcare_alert_events (
   id                      BIGSERIAL PRIMARY KEY,
@@ -352,6 +403,7 @@ CREATE TABLE IF NOT EXISTS wellcare_shared_tracker_settings (
 ALTER TABLE wellcare_connections            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wellcare_connection_invites     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wellcare_notifications          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wellcare_alert_settings         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wellcare_alert_events           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wellcare_shared_tracker_settings ENABLE ROW LEVEL SECURITY;
 
@@ -361,6 +413,8 @@ DROP POLICY IF EXISTS wellcare_invites_select ON wellcare_connection_invites;
 DROP POLICY IF EXISTS wellcare_invites_modify ON wellcare_connection_invites;
 DROP POLICY IF EXISTS wellcare_notifications_select ON wellcare_notifications;
 DROP POLICY IF EXISTS wellcare_notifications_modify ON wellcare_notifications;
+DROP POLICY IF EXISTS wellcare_alert_settings_select ON wellcare_alert_settings;
+DROP POLICY IF EXISTS wellcare_alert_settings_modify ON wellcare_alert_settings;
 DROP POLICY IF EXISTS wellcare_alert_events_select ON wellcare_alert_events;
 DROP POLICY IF EXISTS wellcare_alert_events_modify ON wellcare_alert_events;
 DROP POLICY IF EXISTS wellcare_shared_select ON wellcare_shared_tracker_settings;
@@ -384,6 +438,13 @@ CREATE POLICY wellcare_notifications_select ON wellcare_notifications
   FOR SELECT USING (owner_user_id = auth.uid());
 
 CREATE POLICY wellcare_notifications_modify ON wellcare_notifications
+  FOR ALL USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_alert_settings_select ON wellcare_alert_settings
+  FOR SELECT USING (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_alert_settings_modify ON wellcare_alert_settings
   FOR ALL USING (owner_user_id = auth.uid())
   WITH CHECK (owner_user_id = auth.uid());
 

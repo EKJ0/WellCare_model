@@ -1165,23 +1165,23 @@
     /* =========================================================
        CARE CIRCLE tab
        ========================================================= */
-    .team-row {
+    .care-row {
       display: flex; align-items: center; gap: 12px;
       padding: 14px 0;
       border-top: 1px solid var(--border);
     }
-    .team-row:first-child { border-top: none; padding-top: 4px; }
-    .team-row .name { flex: 1; font-weight: 600; }
-    .team-row .meta {
+    .care-row:first-child { border-top: none; padding-top: 4px; }
+    .care-row .name { flex: 1; font-weight: 600; }
+    .care-row .meta {
       font-size: 11.5px; color: var(--text-soft);
       margin-top: 2px;
     }
-    .team-row .pct {
+    .care-row .pct {
       font-variant-numeric: tabular-nums;
       font-weight: 700;
       font-size: 16px;
     }
-    .team-row.paused { opacity: 0.62; }
+    .care-row.paused { opacity: 0.62; }
     .circle-detail-head {
       display: flex;
       align-items: center;
@@ -3222,15 +3222,15 @@
       out[`had_reorg_${schema.evSuffix}`]    = eventsHad(evWindow, "reorg")           ? 1 : 0;
       out[`had_deadline_${schema.evSuffix}`] = eventsHad(evWindow, "deadline_crunch") ? 1 : 0;
 
-      // PTO recency: scan history backwards for the last "pto" event.
-      let sincePTO = schema.ptoCap;
+      // Recovery-day recency: legacy bundles still call this feature "pto".
+      let sinceRecoveryDay = schema.ptoCap;
       for (let i = N - 1; i >= 0; i--) {
         if (seq[i].events.has("pto")) {
-          sincePTO = Math.min(schema.ptoCap, N - 1 - i);
+          sinceRecoveryDay = Math.min(schema.ptoCap, N - 1 - i);
           break;
         }
       }
-      out[schema.ptoFeat] = sincePTO;
+      out[schema.ptoFeat] = sinceRecoveryDay;
 
       // Interactions — scaled for whichever schema the bundle expects.
       if (schema.kind === "daily") {
@@ -3547,6 +3547,7 @@
     const CONNECTIONS_KEY = 'wellcare_connections_v1';
     const NOTIFS_KEY = 'wellcare_notifications_v1';
     const ALERT_EVENTS_KEY = 'wellcare_alert_events_v1';
+    const PENDING_INVITE_KEY = 'wellcare_pending_invite_token';
     const DEFAULT_SHARE_SETTINGS = {
       risk: true,
       level: true,
@@ -3583,6 +3584,76 @@
       saveJson(CONNECTIONS_KEY, (v || []).map(normalizeConnection));
       try { window.dispatchEvent(new CustomEvent('wellcare-connections-changed')); } catch {}
     }
+    function upsertConnection(rec) {
+      const normalized = normalizeConnection(rec);
+      const conns = loadConnections();
+      const idx = conns.findIndex(c =>
+        c.id === normalized.id ||
+        (normalized.personId && c.personId === normalized.personId)
+      );
+      if (idx >= 0) conns[idx] = { ...conns[idx], ...normalized };
+      else conns.push(normalized);
+      saveConnections(conns);
+      return normalized;
+    }
+
+    function extractInviteToken(raw) {
+      const value = String(raw || '').trim();
+      if (!value) return '';
+      try {
+        const url = new URL(value, window.location.href);
+        return url.searchParams.get('invite')
+          || url.searchParams.get('token')
+          || (url.hash || '').replace(/^#(?:invite=|token=)?/, '')
+          || value;
+      } catch {
+        const match = value.match(/[?#&](?:invite|token)=([^&#]+)/);
+        return match ? decodeURIComponent(match[1]) : value;
+      }
+    }
+
+    function inviteLinkForToken(token) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('invite', token);
+        url.hash = '';
+        return url.toString();
+      } catch {
+        return token;
+      }
+    }
+
+    function encodeLocalInvitePayload(payload) {
+      const bytes = new TextEncoder().encode(JSON.stringify(payload));
+      let bin = '';
+      for (const b of bytes) bin += String.fromCharCode(b);
+      return btoa(bin);
+    }
+
+    function decodeLocalInvitePayload(token) {
+      const bin = atob((token || '').trim());
+      const bytes = Uint8Array.from(bin, ch => ch.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }
+
+    function readPendingInviteFromLocation() {
+      try {
+        const url = new URL(window.location.href);
+        const token = url.searchParams.get('invite') || url.searchParams.get('token');
+        if (!token) return sessionStorage.getItem(PENDING_INVITE_KEY) || '';
+        sessionStorage.setItem(PENDING_INVITE_KEY, token);
+        url.searchParams.delete('invite');
+        url.searchParams.delete('token');
+        window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+        return token;
+      } catch {
+        try { return sessionStorage.getItem(PENDING_INVITE_KEY) || ''; } catch { return ''; }
+      }
+    }
+
+    function clearPendingInvite() {
+      try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch {}
+    }
 
     async function createInviteToken(fromProfile) {
       // Try server-issued token first, fallback to local base64 token when unavailable
@@ -3592,11 +3663,12 @@
       } catch (e) { /* ignore, fallback below */ }
       try {
         const payload = { from: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '', ts: Date.now() };
-        return btoa(JSON.stringify(payload));
+        return encodeLocalInvitePayload(payload);
       } catch { return ''; }
     }
 
     async function acceptInviteToken(token) {
+      token = extractInviteToken(token);
       // Try server accept endpoint first
       try {
         const resp = await fetch('/api/invite/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
@@ -3613,17 +3685,17 @@
               share: j.connection.share,
               created_at: Date.now(),
             });
-            const conns = loadConnections(); conns.push(rec); saveConnections(conns); pushNotification(`${rec.name} joined your Care Circle`); return rec;
+            upsertConnection(rec);
+            pushNotification(`${rec.name} joined your Care Circle`);
+            return rec;
           }
         }
       } catch (e) { /* continue to local fallback */ }
       try {
-        const json = atob((token||'').trim());
-        const obj = JSON.parse(json);
-        const conns = loadConnections();
+        const obj = decodeLocalInvitePayload(token);
         const id = `${obj.from}-${Math.floor(Math.random()*100000)}`;
         const rec = normalizeConnection({ id, personId: obj.from, name: obj.name || obj.from, status: 'accepted', relationship: 'Friend', alertThreshold: 0.75, created_at: Date.now() });
-        conns.push(rec); saveConnections(conns);
+        upsertConnection(rec);
         pushNotification(`${rec.name} joined your Care Circle`);
         return rec;
       } catch (e) { throw new Error('invalid invite'); }
@@ -6236,7 +6308,7 @@
       );
     }
 
-    function TeamTab({ profiles, history, activeProfile }) {
+    function CareCircleTab({ profiles, history, activeProfile }) {
       const [connections, setConnections] = useState(() => loadConnections());
       const [selectedId, setSelectedId] = useState('');
 
@@ -6452,7 +6524,7 @@
               const showRisk = accepted && latest && allowed.risk;
               return (
                 <div key={conn.id}
-                     className={`team-row ${accepted ? '' : 'paused'}`}
+                     className={`care-row ${accepted ? '' : 'paused'}`}
                      onClick={() => setSelectedId(conn.id)}
                      style={{ cursor: 'pointer' }}>
                   <Avatar name={conn.name} color={conn.color || colorFor(conn.name)} />
@@ -6504,15 +6576,16 @@
       async function handleCreateInvite() {
         try {
           const token = await createInviteToken(activeProfile || { personId: 'me', name: 'Me' });
-          try { await navigator.clipboard.writeText(token); } catch {}
-          setToast('Invite copied to clipboard');
+          const link = inviteLinkForToken(token);
+          try { await navigator.clipboard.writeText(link); } catch {}
+          setToast('Invite link copied to clipboard');
         } catch { setToast('Could not create invite'); }
       }
 
       async function handleAcceptInvite() {
         if (!inviteInput) { setToast('Paste an invite code first'); return; }
         try {
-          const rec = await acceptInviteToken(inviteInput);
+          const rec = await acceptInviteToken(extractInviteToken(inviteInput));
           setInviteInput('');
           setToast(`${rec.name} added to Care Circle`);
         } catch (e) { setToast('Invalid invite code'); }
@@ -6786,12 +6859,12 @@
     const TABS = [
       { id: 'home',     label: 'Home' },
       { id: 'insights', label: 'Insights' },
-      { id: 'team',     label: 'Care Circle' },
+      { id: 'care',     label: 'Care Circle' },
       { id: 'profile',  label: 'Profile' },
     ];
 
     /** Tab bar order — used for subtle slide direction on change */
-    const MAIN_TAB_ORDER = ['home', 'insights', 'team', 'tracker', 'profile'];
+    const MAIN_TAB_ORDER = ['home', 'insights', 'care', 'tracker', 'profile'];
     const SUPPORTS_VIEW_TRANSITION =
       typeof document !== 'undefined'
       && typeof document.startViewTransition === 'function';
@@ -6829,6 +6902,7 @@
       const [toast, setToast]             = useState(null);
       const [showNotifPanel, setShowNotifPanel] = useState(false);
       const [notifications, setNotifications] = useState(() => loadNotifications());
+      const [pendingInviteToken, setPendingInviteToken] = useState(() => readPendingInviteFromLocation());
       const [showProfileMgr, setShowProfileMgr] = useState(false);
 
       // Daily tracker — keyed by the active profile + today's date.
@@ -6986,6 +7060,27 @@
         window.addEventListener('wellcare-notifications-changed', refresh);
         return () => window.removeEventListener('wellcare-notifications-changed', refresh);
       }, []);
+
+      useEffect(() => {
+        if (!activeProfile || !pendingInviteToken) return;
+        let cancelled = false;
+        acceptInviteToken(pendingInviteToken)
+          .then(rec => {
+            if (cancelled) return;
+            clearPendingInvite();
+            setPendingInviteToken('');
+            setNotifications(loadNotifications());
+            setToast(`${rec.name} added to Care Circle`);
+            goTab('care');
+          })
+          .catch(() => {
+            if (cancelled) return;
+            clearPendingInvite();
+            setPendingInviteToken('');
+            setToast('Invite link was invalid or expired');
+          });
+        return () => { cancelled = true; };
+      }, [activeProfile?.id, pendingInviteToken, goTab]);
 
       useEffect(() => {
         if ('serviceWorker' in navigator) {
@@ -7273,24 +7368,6 @@
         setProfiles(ps => ps.filter(p => p.id !== id));
         if (id === activeId) setActiveId('');
       };
-      const onPickFromTeam = (profileId) => {
-        const p = profiles.find(x => x.id === profileId);
-        if (!p) return;
-        if (p.id !== activeId) {
-          // Switching to a protected profile means signing out and going
-          // through the login screen again.
-          if (p.passwordHash) {
-            setActiveId('');
-            setToast(`Sign in as ${p.name} to drill in`);
-          } else {
-            setActiveId(p.id);
-            goTab('insights');
-          }
-        } else {
-          goTab('insights');
-        }
-      };
-
       // ============ LOGIN ============
       if (!activeProfile) {
         return (
@@ -7454,12 +7531,11 @@
                   activeProfile={activeProfile}
                 />
               )}
-              {tab === 'team' && (
-                <TeamTab
+              {tab === 'care' && (
+                <CareCircleTab
                   profiles={profiles}
                   history={history}
                   activeProfile={activeProfile}
-                  onPickPerson={onPickFromTeam}
                 />
               )}
               {tab === 'tracker' && (
@@ -7507,8 +7583,8 @@
                 <span>Dashboard</span>
               </button>
               <button type="button"
-                      className={`tab ${tab === 'team' ? 'active' : ''}`}
-                      onClick={() => goTab('team')}>
+                      className={`tab ${tab === 'care' ? 'active' : ''}`}
+                      onClick={() => goTab('care')}>
                 {/* simple people icon */}
                 <svg viewBox="0 0 24 24" fill="none">
                   <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.6" />

@@ -54,6 +54,8 @@ async function run() {
     assert.strictEqual(db.statusCode, 200, 'database endpoint should return 200');
     assert.ok(Array.isArray(db.body.invites), 'db includes invites array');
     assert.ok(Array.isArray(db.body.connections), 'db includes connections array');
+    assert.strictEqual(db.body.invites[0].status, 'accepted');
+    assert.ok(db.body.invites[0].accepted_at, 'accepted invite records accepted_at');
     assert.strictEqual(db.body.connections[0].personId, 'me');
 
     console.log('All server tests passed.');

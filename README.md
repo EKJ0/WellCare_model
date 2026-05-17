@@ -27,7 +27,7 @@ Current product direction:
 Next recommended steps:
 
 1. Keep the standalone PWA for the next demo, then migrate to React/Vite when
-   the screen flows stabilize.
+   the screen flows stabilize. See `docs/ARCHITECTURE.md`.
 2. Replace prototype localStorage sync with authenticated cloud storage for
    users, check-ins, connections, shared tracker settings, notifications, alert
    thresholds, and alert history.
@@ -63,6 +63,9 @@ WellCare_model/
 ├── checkin-app.html              # standalone PWA — open in any browser
 ├── manifest.webmanifest          # PWA install metadata
 ├── sw.js                         # offline service worker
+├── docs/                         # architecture and migration notes
+├── database/                     # cloud schema foundation
+├── server/                       # prototype invite server
 └── outputs - Copy/               # the Python ML pipeline
     │
     ├── scenarios.py              # synthetic data generator + feature engineering

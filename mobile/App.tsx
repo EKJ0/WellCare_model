@@ -4,8 +4,6 @@ import {
   ActivityIndicator,
   BackHandler,
   Platform,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';

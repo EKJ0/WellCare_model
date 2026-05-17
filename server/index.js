@@ -69,6 +69,7 @@ app.post('/api/invite/accept', (req, res) => {
 
   // mark invite accepted and create connection
   invite.status = 'accepted';
+  invite.accepted_at = new Date().toISOString();
   const conn = {
     id: crypto.randomUUID(),
     personId: payload.from,

@@ -26,7 +26,10 @@ DATA NEVER MIXES ACROSS PEOPLE (for training)
 
 ORDER OF SYNC IN APP (when you implement API writes)
   1) Upsert wellcare_profiles
-  2) Insert check-ins / tracker / safety_net / settings / bundles
+  2) Insert check-ins / tracker / settings / bundles
+  3) Insert connection_invites and accepted connections
+  4) Upsert shared_tracker_settings and alert_settings per connection
+  5) Insert notifications and alert_events after scoring/threshold checks
 
 HOW TO RUN SQL
   - SQL Editor: paste each file and execute (or use Migrations page if you prefer).
