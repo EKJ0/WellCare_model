@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "WellCare Check-in",
+    "slug": "wellcare-checkin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#F6F0E7",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.wellcare.checkin"
+    },
+    "android": {
+      "package": "com.wellcare.checkin",
+      "adaptiveIcon": {
+        "backgroundColor": "#3F6B3A"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
