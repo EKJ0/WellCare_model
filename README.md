@@ -11,6 +11,24 @@ app installs as a PWA on your phone.
 
 ---
 
+Changes I made (quick dev notes):
+
+- Archived the simple JSX mock: `archive/checkin-app.jsx` (moved from root).
+- Renamed visible "Team" wording to "Care Circle" in `checkin-app.html`.
+  - Updated tab label, empty-state text, and question wording for clarity.
+- Left all application logic intact; these are UI copy and small UX updates
+  to match the new product direction (Care Circle / Connections).
+
+Next recommended steps (short):
+
+1. Decide app architecture: keep the single-file PWA for demos or migrate
+   `checkin-app.html` into a proper React/Vite `src/` structure.
+2. Add a Connections / Care Circle screen backed by a user account model
+   and database tables (see `database/schema_wellcare.sql` for starting ideas).
+3. Implement invite/accept flows and an in-app notification center before
+   enabling push notifications.
+
+
 ## Quick start
 
 ```powershell
@@ -111,6 +129,33 @@ python calibration_plot.py
 # See which teams scored highest, eyeball their signals
 python inspect_model.py
 ```
+
+---
+
+## Optional: Run the invite server (prototype)
+
+The demo includes a small Express server that issues signed, time-limited invite tokens and persists invites/connections to `server/data/db.json`.
+
+1. Install and start the server:
+
+```powershell
+cd server
+npm install
+npm start
+```
+
+2. The web app will try the server at `/api/invite/*` automatically and fall back to a local client-only invite format if the server is unreachable.
+
+Security: the server uses an HMAC secret (`WELLCARE_SECRET` in `.env`) to sign tokens. This prototype stores data in a JSON file; replace with Postgres and proper auth for production.
+
+### Run the server tests
+
+```powershell
+cd server
+npm test
+```
+
+This verifies the invite creation and accept flow and checks the file-backed JSON persistence.
 
 ---
 

@@ -234,3 +234,129 @@ CREATE POLICY wellcare_bundle_modify ON wellcare_personal_model_bundles
 -- -----------------------------------------------------------------------------
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 -- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Connections / invites / notifications — persistence for Care Circle features
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS wellcare_connections (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id           UUID NOT NULL,
+  profile_person_id       TEXT NOT NULL,
+
+  connection_person_id    TEXT NOT NULL,
+  connection_name         TEXT,
+  relationship            TEXT,
+  alert_threshold         DOUBLE PRECISION DEFAULT 0.75,
+
+  share_json              JSONB NOT NULL DEFAULT '{}'::jsonb,
+  status                  TEXT DEFAULT 'active',
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wellcare_connections_unique_pair
+    UNIQUE (owner_user_id, profile_person_id, connection_person_id),
+
+  CONSTRAINT wellcare_connections_profile_fk
+    FOREIGN KEY (owner_user_id, profile_person_id)
+    REFERENCES wellcare_profiles (owner_user_id, profile_person_id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS wellcare_connections_owner_idx
+  ON wellcare_connections (owner_user_id);
+
+CREATE TABLE IF NOT EXISTS wellcare_connection_invites (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id           UUID NOT NULL,
+  profile_person_id       TEXT NOT NULL,
+
+  token_hash              TEXT,
+  to_email                TEXT,
+  to_person_id            TEXT,
+  status                  TEXT DEFAULT 'pending',
+  expires_at              TIMESTAMPTZ,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wellcare_invites_profile_fk
+    FOREIGN KEY (owner_user_id, profile_person_id)
+    REFERENCES wellcare_profiles (owner_user_id, profile_person_id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS wellcare_invites_owner_idx
+  ON wellcare_connection_invites (owner_user_id);
+
+CREATE TABLE IF NOT EXISTS wellcare_notifications (
+  id                      BIGSERIAL PRIMARY KEY,
+  owner_user_id           UUID NOT NULL,
+  profile_person_id       TEXT NOT NULL,
+
+  payload_json            JSONB NOT NULL DEFAULT '{}'::jsonb,
+  is_read                 BOOLEAN DEFAULT FALSE,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT wellcare_notifications_profile_fk
+    FOREIGN KEY (owner_user_id, profile_person_id)
+    REFERENCES wellcare_profiles (owner_user_id, profile_person_id)
+    ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS wellcare_notifications_owner_idx
+  ON wellcare_notifications (owner_user_id, profile_person_id);
+
+CREATE TABLE IF NOT EXISTS wellcare_shared_tracker_settings (
+  owner_user_id           UUID NOT NULL,
+  profile_person_id       TEXT NOT NULL,
+
+  settings_json           JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  PRIMARY KEY (owner_user_id, profile_person_id),
+
+  CONSTRAINT wellcare_shared_settings_profile_fk
+    FOREIGN KEY (owner_user_id, profile_person_id)
+    REFERENCES wellcare_profiles (owner_user_id, profile_person_id)
+    ON DELETE CASCADE
+);
+
+-- Enable RLS and basic policies for the new tables
+ALTER TABLE wellcare_connections            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wellcare_connection_invites     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wellcare_notifications          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wellcare_shared_tracker_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS wellcare_connections_select ON wellcare_connections;
+DROP POLICY IF EXISTS wellcare_connections_modify ON wellcare_connections;
+DROP POLICY IF EXISTS wellcare_invites_select ON wellcare_connection_invites;
+DROP POLICY IF EXISTS wellcare_invites_modify ON wellcare_connection_invites;
+DROP POLICY IF EXISTS wellcare_notifications_select ON wellcare_notifications;
+DROP POLICY IF EXISTS wellcare_notifications_modify ON wellcare_notifications;
+DROP POLICY IF EXISTS wellcare_shared_select ON wellcare_shared_tracker_settings;
+DROP POLICY IF EXISTS wellcare_shared_modify ON wellcare_shared_tracker_settings;
+
+CREATE POLICY wellcare_connections_select ON wellcare_connections
+  FOR SELECT USING (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_connections_modify ON wellcare_connections
+  FOR ALL USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_invites_select ON wellcare_connection_invites
+  FOR SELECT USING (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_invites_modify ON wellcare_connection_invites
+  FOR ALL USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_notifications_select ON wellcare_notifications
+  FOR SELECT USING (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_notifications_modify ON wellcare_notifications
+  FOR ALL USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_shared_select ON wellcare_shared_tracker_settings
+  FOR SELECT USING (owner_user_id = auth.uid());
+
+CREATE POLICY wellcare_shared_modify ON wellcare_shared_tracker_settings
+  FOR ALL USING (owner_user_id = auth.uid())
+  WITH CHECK (owner_user_id = auth.uid());
