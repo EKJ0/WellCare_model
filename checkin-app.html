@@ -4265,12 +4265,20 @@
     async function createInviteToken(fromProfile, options) {
       const sharingMode = (options && options.sharingMode) || DEFAULT_SHARING_MODE;
       const preset = SHARING_MODES[sharingMode] || SHARING_MODES[DEFAULT_SHARING_MODE];
+      const share = (options && options.share) || preset.permissions;
+      const alertThreshold = Number.isFinite(+((options || {}).alertThreshold))
+        ? +options.alertThreshold
+        : preset.alertThreshold;
+      const notificationEnabled = options &&
+        Object.prototype.hasOwnProperty.call(options, 'notificationEnabled')
+        ? options.notificationEnabled !== false
+        : preset.notificationEnabled !== false;
       const inviteBody = {
         from: { personId: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '' },
         sharingMode,
-        share: preset.permissions,
-        alertThreshold: preset.alertThreshold,
-        notificationEnabled: preset.notificationEnabled,
+        share,
+        alertThreshold,
+        notificationEnabled,
       };
       // Try server-issued token first, fallback to local base64 token when unavailable
       try {
@@ -4282,20 +4290,28 @@
           from: fromProfile.personId || fromProfile.id || 'unknown',
           name: fromProfile.name || '',
           sharingMode,
-          share: preset.permissions,
-          alertThreshold: preset.alertThreshold,
-          notificationEnabled: preset.notificationEnabled,
+          share,
+          alertThreshold,
+          notificationEnabled,
           ts: Date.now(),
         };
         return encodeLocalInvitePayload(payload);
       } catch { return ''; }
     }
 
-    async function acceptInviteToken(token) {
+    async function acceptInviteToken(token, acceptorProfile) {
       token = extractInviteToken(token);
       // Try server accept endpoint first
       try {
-        const resp = await fetch('/api/invite/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+        const acceptor = acceptorProfile ? {
+          personId: acceptorProfile.personId || acceptorProfile.id || '',
+          name: acceptorProfile.name || '',
+        } : null;
+        const resp = await fetch('/api/invite/accept', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, acceptor }),
+        });
         if (resp.ok) {
           const j = await resp.json();
           if (j && j.connection) {
@@ -4376,10 +4392,13 @@
         });
       } catch {}
     }
-    async function fetchSharedTracker(personId) {
+    async function fetchSharedTracker(personId, viewerPersonId) {
       if (!personId) return [];
       try {
-        const resp = await fetch(`/api/shared-tracker/${encodeURIComponent(personId)}`);
+        const qs = viewerPersonId
+          ? `?viewerPersonId=${encodeURIComponent(viewerPersonId)}`
+          : '';
+        const resp = await fetch(`/api/shared-tracker/${encodeURIComponent(personId)}${qs}`);
         if (!resp.ok) return [];
         const data = await resp.json();
         return Array.isArray(data.checkins) ? data.checkins : [];
@@ -5814,7 +5833,7 @@
        TAB CONTENT — Home
        ========================================================= */
     function HomeTab({ activeProfile, personHist, stats, insights,
-                       onStartCheckin, onGoTracker }) {
+                       onStartCheckin, onGoTracker, onToast }) {
       const thisWeekKey = isoDate(new Date());
       const thisWeek = personHist.find(e =>
         isoDate(new Date(e.when)) === thisWeekKey);
@@ -5894,9 +5913,17 @@
         return d + 'd ago';
       }
 
-      function snSendInvite() {
+      async function snSendInvite() {
         if (!snValid) return;
-        const link = window.location.href.split('#')[0];
+        const thresholdProb = snThreshold / 100;
+        let link = window.location.href.split('#')[0];
+        try {
+          const token = await createInviteToken(activeProfile, {
+            sharingMode: 'supportive',
+            alertThreshold: thresholdProb,
+          });
+          link = inviteLinkForToken(token);
+        } catch {}
         const greet = snName.trim()
           ? 'Hi ' + snName.trim().split(' ')[0] + ','
           : 'Hi,';
@@ -5933,9 +5960,24 @@
           invitedAt: Date.now(),
           status: 'pending',
         };
+        upsertConnection({
+          id: `pending-${newC.id}`,
+          personId: snValue.trim(),
+          name: newC.name,
+          relationship: snRel,
+          status: 'pending',
+          alertThreshold: thresholdProb,
+          share: SHARING_MODES.supportive.permissions,
+          notificationEnabled: true,
+          sharingMode: 'supportive',
+          invitedAt: newC.invitedAt,
+          method: snMethod,
+          value: snValue.trim(),
+        });
         setSnContacts(cs => [newC, ...cs]);
         setSnName('');
         setSnValue('');
+        onToast && onToast('Invite created in Care Circle');
       }
 
       function snResend(c) {
@@ -7177,13 +7219,13 @@
           setRemoteTracker({});
           return;
         }
-        Promise.all(ids.map(async id => [id, await fetchSharedTracker(id)]))
+        Promise.all(ids.map(async id => [id, await fetchSharedTracker(id, activeProfile.personId)]))
           .then(entries => {
             if (cancelled) return;
             setRemoteTracker(Object.fromEntries(entries));
           });
         return () => { cancelled = true; };
-      }, [connections]);
+      }, [connections, activeProfile.personId]);
 
       const byPerson = useMemo(() => {
         const map = new Map();
@@ -7652,6 +7694,7 @@
       onExport, onImportClick,
       onManageProfiles, onSignOut,
       onClearAll,
+      onToast,
     }) {
       const userCheckins = history.filter(
         e => e.person_id === activeProfile.personId).length;
@@ -7669,18 +7712,18 @@
           const token = await createInviteToken(activeProfile || { personId: 'me', name: 'Me' });
           const link = inviteLinkForToken(token);
           try { await navigator.clipboard.writeText(link); } catch {}
-          setToast('Invite link copied to clipboard');
-        } catch { setToast('Could not create invite'); }
+          onToast && onToast('Invite link copied to clipboard');
+        } catch { onToast && onToast('Could not create invite'); }
       }
 
       async function handleAcceptInvite() {
-        if (!inviteInput) { setToast('Paste an invite code first'); return; }
+        if (!inviteInput) { onToast && onToast('Paste invite link or code first'); return; }
         try {
-          const rec = await acceptInviteToken(extractInviteToken(inviteInput));
+          const rec = await acceptInviteToken(extractInviteToken(inviteInput), activeProfile);
           setProfileConnections(loadConnections());
           setInviteInput('');
-          setToast(`${rec.name} added to Care Circle`);
-        } catch (e) { setToast('Invalid invite code'); }
+          onToast && onToast(`${rec.name} added to Care Circle`);
+        } catch (e) { onToast && onToast('Invalid invite code'); }
       }
 
       function updateConnection(id, patch) {
@@ -7689,7 +7732,7 @@
           saveConnections(cs);
           return cs;
         });
-        setToast('Saved');
+        onToast && onToast('Saved');
       }
       return (
         <div className="pane">
@@ -8126,7 +8169,7 @@
       useEffect(() => {
         if (!activeProfile || !pendingInviteToken) return;
         let cancelled = false;
-        acceptInviteToken(pendingInviteToken)
+        acceptInviteToken(pendingInviteToken, activeProfile)
           .then(rec => {
             if (cancelled) return;
             clearPendingInvite();
@@ -8583,6 +8626,7 @@
                   insights={insights}
                   onStartCheckin={startCheckin}
                   onGoTracker={() => goTab('tracker')}
+                  onToast={setToast}
                 />
               )}
               {tab === 'care' && (
@@ -8616,6 +8660,7 @@
                   onManageProfiles={() => setShowProfileMgr(true)}
                   onSignOut={onSignOut}
                   onClearAll={clearAll}
+                  onToast={setToast}
                 />
               )}
               </div>

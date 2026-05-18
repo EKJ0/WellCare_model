@@ -155,7 +155,11 @@ npm start
 
 2. The web app will try the server at `/api/invite/*` automatically and fall back to a local client-only invite format if the server is unreachable.
 
-Security: the server uses an HMAC secret (`WELLCARE_SECRET` in `.env`) to sign tokens. This prototype stores data in a JSON file; replace with Postgres and proper auth for production.
+Security: the server uses an HMAC secret (`WELLCARE_SECRET` in `.env`) to sign
+tokens. Invite privacy settings are carried through acceptance, shared tracker
+reads require a connected viewer identity, and the raw debug database endpoint
+is hidden unless `WELLCARE_ENABLE_DEBUG_DB=true`. This prototype still stores
+data in a JSON file; replace with Postgres and proper auth for production.
 
 ### Run the server tests
 

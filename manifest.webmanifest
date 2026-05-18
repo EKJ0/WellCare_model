@@ -1,7 +1,7 @@
 {
-  "name": "Burnout Check-in",
-  "short_name": "Check-in",
-  "description": "Weekly burnout-risk check-in. Local-first, no account.",
+  "name": "WellCare",
+  "short_name": "WellCare",
+  "description": "Daily burnout-risk check-in with private Care Circle support.",
   "start_url": "checkin-app.html",
   "scope": "./",
   "display": "standalone",

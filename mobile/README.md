@@ -13,12 +13,13 @@ npm install
 
 ## Configure the URL
 
-Open `App.tsx` and replace the `PWA_URL` constant with the URL where you've
-deployed `checkin-app.html` (e.g. Netlify, Vercel, GitHub Pages, your own
-server). The URL **must** be HTTPS.
+Set `EXPO_PUBLIC_PWA_URL` to the URL where you've deployed
+`checkin-app.html` (e.g. Netlify, Vercel, GitHub Pages, your own server).
+The URL **must** be HTTPS. `App.tsx` still has a placeholder fallback so
+missing configuration is obvious during testing.
 
-```ts
-const PWA_URL = 'https://your-site.netlify.app';
+```powershell
+$env:EXPO_PUBLIC_PWA_URL = 'https://your-site.netlify.app'
 ```
 
 ## Build an Android APK with EAS

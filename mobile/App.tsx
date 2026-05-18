@@ -10,12 +10,9 @@ import {
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 import { useEffect } from 'react';
 
-// =====================================================================
-//   EDIT THIS LINE after deploying the PWA to Netlify (or anywhere).
-//   The URL must be HTTPS and serve the WellCare check-in app.
-//   Example: 'https://wellcare-checkin.netlify.app'
-// =====================================================================
-const PWA_URL = 'https://REPLACE_ME.netlify.app';
+const PWA_URL =
+  (globalThis as any).process?.env?.EXPO_PUBLIC_PWA_URL ||
+  'https://REPLACE_ME.netlify.app';
 
 export default function App() {
   const webRef = useRef<WebView>(null);

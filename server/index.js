@@ -7,6 +7,29 @@ require('dotenv').config();
 const PORT = process.env.PORT || 3000;
 const SECRET = process.env.WELLCARE_SECRET || 'dev-secret-change-me';
 const DB_PATH = process.env.WELLCARE_DB_PATH || path.join(__dirname, 'data', 'db.json');
+const DEBUG_DB_ENABLED = process.env.WELLCARE_ENABLE_DEBUG_DB === 'true';
+
+const DEFAULT_SHARE_SETTINGS = {
+  risk: true,
+  level: true,
+  trend: true,
+  last_checkin: true,
+  top_contributors: false,
+  recovery_status: false,
+  important_updates: true,
+  private_answers: false,
+  notes: false,
+};
+
+function normalizeShareSettings(share) {
+  return { ...DEFAULT_SHARE_SETTINGS, ...(share && typeof share === 'object' ? share : {}) };
+}
+
+function normalizeThreshold(value, fallback = 0.75) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(1, n));
+}
 
 function ensureDb() {
   const dir = path.dirname(DB_PATH);
@@ -38,7 +61,10 @@ function verifyToken(token) {
   if (parts.length !== 2) return null;
   const [b, h] = parts;
   const expect = crypto.createHmac('sha256', SECRET).update(b).digest('hex');
-  if (!crypto.timingSafeEqual(Buffer.from(h), Buffer.from(expect))) return null;
+  const given = Buffer.from(h);
+  const wanted = Buffer.from(expect);
+  if (given.length !== wanted.length) return null;
+  if (!crypto.timingSafeEqual(given, wanted)) return null;
   try { return JSON.parse(Buffer.from(b, 'base64url').toString('utf8')); } catch (e) { return null; }
 }
 
@@ -53,12 +79,35 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.post('/api/invite/create', (req, res) => {
   const from = req.body.from || { personId: 'me', name: 'Me' };
-  const payload = { from: from.personId || from.id || 'me', name: from.name || '', ts: Date.now(), exp: Date.now() + (7 * 24 * 3600 * 1000) };
+  const share = normalizeShareSettings(req.body.share);
+  const alertThreshold = normalizeThreshold(req.body.alertThreshold);
+  const payload = {
+    from: from.personId || from.id || 'me',
+    name: from.name || '',
+    sharingMode: req.body.sharingMode || 'supportive',
+    share,
+    alertThreshold,
+    notificationEnabled: req.body.notificationEnabled !== false,
+    ts: Date.now(),
+    exp: Date.now() + (7 * 24 * 3600 * 1000),
+  };
   const token = makeToken(payload);
 
   const db = readDb();
   const token_hash = crypto.createHash('sha256').update(token).digest('hex');
-  db.invites.push({ id: crypto.randomUUID(), from: payload.from, name: payload.name, token_hash, status: 'pending', expires_at: new Date(payload.exp).toISOString(), created_at: new Date().toISOString() });
+  db.invites.push({
+    id: crypto.randomUUID(),
+    from: payload.from,
+    name: payload.name,
+    sharingMode: payload.sharingMode,
+    share: payload.share,
+    alertThreshold: payload.alertThreshold,
+    notificationEnabled: payload.notificationEnabled,
+    token_hash,
+    status: 'pending',
+    expires_at: new Date(payload.exp).toISOString(),
+    created_at: new Date().toISOString(),
+  });
   writeDb(db);
 
   res.json({ token });
@@ -66,6 +115,7 @@ app.post('/api/invite/create', (req, res) => {
 
 app.post('/api/invite/accept', (req, res) => {
   const token = req.body.token;
+  const acceptor = req.body.acceptor || {};
   const payload = verifyToken(token);
   if (!payload) return res.status(400).json({ error: 'invalid_token' });
   if (payload.exp && Date.now() > payload.exp) return res.status(400).json({ error: 'expired' });
@@ -78,24 +128,20 @@ app.post('/api/invite/accept', (req, res) => {
   // mark invite accepted and create connection
   invite.status = 'accepted';
   invite.accepted_at = new Date().toISOString();
+  invite.accepted_by = acceptor.personId || acceptor.id || null;
+  const sharingMode = payload.sharingMode || invite.sharingMode || 'supportive';
   const conn = {
     id: crypto.randomUUID(),
     personId: payload.from,
+    connectedPersonId: acceptor.personId || acceptor.id || null,
+    connectedName: acceptor.name || '',
     name: payload.name || payload.from,
     relationship: 'Friend',
     status: 'accepted',
-    alertThreshold: 0.75,
-    notificationEnabled: true,
-    share: {
-      risk: true,
-      level: true,
-      trend: true,
-      last_checkin: true,
-      top_contributors: false,
-      recovery_status: false,
-      private_answers: false,
-      notes: false,
-    },
+    sharingMode,
+    alertThreshold: normalizeThreshold(payload.alertThreshold, invite.alertThreshold),
+    notificationEnabled: payload.notificationEnabled !== false,
+    share: normalizeShareSettings(payload.share || invite.share),
     created_at: new Date().toISOString(),
   };
   db.connections.push(conn);
@@ -136,7 +182,20 @@ app.post('/api/checkins', (req, res) => {
 
 app.get('/api/shared-tracker/:personId', (req, res) => {
   const personId = String(req.params.personId || '').trim();
+  const viewerPersonId = String(req.query.viewerPersonId || req.query.viewer || '').trim();
+  if (!viewerPersonId) return res.status(400).json({ error: 'missing_viewer_person_id' });
+
   const db = readDb();
+  const canViewSelf = viewerPersonId === personId;
+  const hasAcceptedConnection = db.connections.some(c =>
+    c.status === 'accepted' &&
+    c.personId === personId &&
+    c.connectedPersonId === viewerPersonId
+  );
+  if (!canViewSelf && !hasAcceptedConnection) {
+    return res.status(403).json({ error: 'not_connected' });
+  }
+
   const rows = db.checkins
     .filter(x => x.person_id === personId)
     .sort((a, b) => new Date(b.when) - new Date(a.when))
@@ -145,6 +204,7 @@ app.get('/api/shared-tracker/:personId', (req, res) => {
 });
 
 app.get('/api/db', (req, res) => {
+  if (!DEBUG_DB_ENABLED) return res.status(404).json({ error: 'not_found' });
   res.json(readDb());
 });
 

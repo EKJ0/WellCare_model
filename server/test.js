@@ -33,30 +33,55 @@ async function run() {
   const server = app.listen(0);
   const port = server.address().port;
   try {
-    const create = await request(port, { method: 'POST', path: '/api/invite/create', headers: { 'Content-Type': 'application/json' } }, { from: { personId: 'me', name: 'Me' } });
+    const create = await request(port, { method: 'POST', path: '/api/invite/create', headers: { 'Content-Type': 'application/json' } }, {
+      from: { personId: 'me', name: 'Me' },
+      sharingMode: 'minimal',
+      alertThreshold: 0.8,
+      notificationEnabled: true,
+      share: {
+        risk: false,
+        level: true,
+        trend: false,
+        last_checkin: true,
+        notes: false,
+      },
+    });
     assert.strictEqual(create.statusCode, 200, 'invite create should return 200');
     assert.ok(create.body.token, 'invite create response contains token');
     assert.ok(create.body.token.includes('.'), 'token should be signed');
 
-    const accept = await request(port, { method: 'POST', path: '/api/invite/accept', headers: { 'Content-Type': 'application/json' } }, { token: create.body.token });
+    const invalid = await request(port, { method: 'POST', path: '/api/invite/accept', headers: { 'Content-Type': 'application/json' } }, { token: 'short.bad' });
+    assert.strictEqual(invalid.statusCode, 400, 'malformed token should return 400');
+    assert.strictEqual(invalid.body.error, 'invalid_token');
+
+    const accept = await request(port, { method: 'POST', path: '/api/invite/accept', headers: { 'Content-Type': 'application/json' } }, {
+      token: create.body.token,
+      acceptor: { personId: 'friend', name: 'Friend' },
+    });
     assert.strictEqual(accept.statusCode, 200, 'invite accept should return 200');
     assert.ok(accept.body.connection, 'invite accept response contains connection');
     assert.strictEqual(accept.body.connection.personId, 'me');
+    assert.strictEqual(accept.body.connection.connectedPersonId, 'friend');
     assert.strictEqual(accept.body.connection.status, 'accepted');
+    assert.strictEqual(accept.body.connection.sharingMode, 'minimal');
+    assert.strictEqual(accept.body.connection.alertThreshold, 0.8);
     assert.strictEqual(accept.body.connection.notificationEnabled, true);
-    assert.strictEqual(accept.body.connection.share.risk, true);
-    assert.strictEqual(accept.body.connection.share.trend, true);
+    assert.strictEqual(accept.body.connection.share.risk, false);
+    assert.strictEqual(accept.body.connection.share.trend, false);
     assert.strictEqual(accept.body.connection.share.last_checkin, true);
     assert.strictEqual(accept.body.connection.share.private_answers, false);
     assert.strictEqual(accept.body.connection.share.notes, false);
 
-    const db = await request(port, { method: 'GET', path: '/api/db' });
-    assert.strictEqual(db.statusCode, 200, 'database endpoint should return 200');
-    assert.ok(Array.isArray(db.body.invites), 'db includes invites array');
-    assert.ok(Array.isArray(db.body.connections), 'db includes connections array');
-    assert.strictEqual(db.body.invites[0].status, 'accepted');
-    assert.ok(db.body.invites[0].accepted_at, 'accepted invite records accepted_at');
-    assert.strictEqual(db.body.connections[0].personId, 'me');
+    const dbEndpoint = await request(port, { method: 'GET', path: '/api/db' });
+    assert.strictEqual(dbEndpoint.statusCode, 404, 'database endpoint is hidden by default');
+
+    const db = JSON.parse(fs.readFileSync(process.env.WELLCARE_DB_PATH, 'utf8'));
+    assert.ok(Array.isArray(db.invites), 'db includes invites array');
+    assert.ok(Array.isArray(db.connections), 'db includes connections array');
+    assert.strictEqual(db.invites[0].status, 'accepted');
+    assert.ok(db.invites[0].accepted_at, 'accepted invite records accepted_at');
+    assert.strictEqual(db.invites[0].accepted_by, 'friend');
+    assert.strictEqual(db.connections[0].personId, 'me');
 
     const checkin = await request(port, { method: 'POST', path: '/api/checkins', headers: { 'Content-Type': 'application/json' } }, {
       personId: 'me',
@@ -67,7 +92,13 @@ async function run() {
     assert.strictEqual(checkin.body.checkin.risk, 0.72);
     assert.strictEqual(checkin.body.checkin.notes, undefined, 'shared checkin must not expose notes');
 
-    const shared = await request(port, { method: 'GET', path: '/api/shared-tracker/me' });
+    const missingViewer = await request(port, { method: 'GET', path: '/api/shared-tracker/me' });
+    assert.strictEqual(missingViewer.statusCode, 400, 'shared tracker requires viewer identity');
+
+    const wrongViewer = await request(port, { method: 'GET', path: '/api/shared-tracker/me?viewerPersonId=stranger' });
+    assert.strictEqual(wrongViewer.statusCode, 403, 'shared tracker rejects unconnected viewers');
+
+    const shared = await request(port, { method: 'GET', path: '/api/shared-tracker/me?viewerPersonId=friend' });
     assert.strictEqual(shared.statusCode, 200, 'shared tracker should return 200');
     assert.strictEqual(shared.body.checkins.length, 1);
     assert.strictEqual(shared.body.checkins[0].person_id, 'me');
