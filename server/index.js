@@ -165,6 +165,8 @@ app.post('/api/checkins', (req, res) => {
     when,
     risk: Math.max(0, Math.min(1, risk)),
     verdict: entry.verdict || '',
+    recovery_status: entry.recovery_status || '',
+    recovery_key: entry.recovery_key || '',
     updated_at: new Date().toISOString(),
   };
 

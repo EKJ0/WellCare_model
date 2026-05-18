@@ -23,6 +23,10 @@ Current product direction:
 - Default sharing is limited to burnout risk percentage, risk level, trend, and
   last check-in time. Private answers, notes, exact habit details, and sensitive
   explanations stay hidden unless explicitly enabled later.
+- Daily Tracker entries now produce a Recovery Status from sleep quality,
+  hydration, movement, breaks, real rest, social connection, and habit context.
+  It is shown in the app, shared only when a connection allows recovery-status
+  sharing, and exported with CSV history for future model training.
 
 Next recommended steps:
 
