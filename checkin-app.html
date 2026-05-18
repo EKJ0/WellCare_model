@@ -1492,6 +1492,162 @@
     }
     .big-slider .scale-ends span { letter-spacing: 0.4px; }
 
+    /* Tick row under the 1–10 slider */
+    .big-slider-ticks {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding: 0 2px;
+      pointer-events: none;
+    }
+    .big-slider-ticks .tick {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--text-soft) 35%, transparent);
+      transition: background 0.15s, transform 0.15s;
+    }
+    .big-slider-ticks .tick.on {
+      background: var(--primary);
+      transform: scale(1.25);
+    }
+
+    /* =========================================================
+       Number question — modern stepper + range
+       Replaces the old "− [big input] +" row with a calm
+       value display sitting above a real slider track.
+       ========================================================= */
+    .num-pro {
+      display: grid;
+      gap: 24px;
+      padding: 22px 18px;
+      border-radius: 22px;
+      background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+      border: 1px solid var(--border);
+      box-shadow:
+        0 1px 0 color-mix(in srgb, #fff 6%, transparent) inset,
+        0 10px 28px rgba(0,0,0,0.18);
+    }
+    .num-pro-display {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .num-pro-value {
+      font-family: var(--display-font);
+      font-size: 76px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -2.2px;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, var(--text) 0%,
+                  color-mix(in srgb, var(--text) 78%, var(--primary)) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .num-pro-unit {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      letter-spacing: 0.3px;
+      text-transform: lowercase;
+    }
+    .num-pro-control {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+    }
+    .num-pro-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 1px solid var(--border-strong);
+      background: color-mix(in srgb, var(--surface-2) 80%, var(--bg));
+      color: var(--primary);
+      font-size: 22px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.05s, border-color 0.15s, color 0.15s;
+      flex: 0 0 auto;
+    }
+    .num-pro-btn:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+      border-color: color-mix(in srgb, var(--primary) 50%, var(--border-strong));
+    }
+    .num-pro-btn:active:not(:disabled) { transform: scale(0.94); }
+    .num-pro-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .num-pro-track {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+    .num-pro-track input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(to right,
+        var(--primary) 0%,
+        var(--primary) var(--pct, 50%),
+        color-mix(in srgb, var(--surface-2) 80%, var(--bg)) var(--pct, 50%),
+        color-mix(in srgb, var(--surface-2) 80%, var(--bg)) 100%);
+      outline: none;
+      cursor: pointer;
+    }
+    .num-pro-track input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 4px solid var(--bg);
+      box-shadow: 0 3px 10px rgba(63,107,58,0.45);
+      cursor: grab;
+      transition: transform 0.12s;
+    }
+    .num-pro-track input[type=range]::-webkit-slider-thumb:active {
+      transform: scale(1.15);
+      cursor: grabbing;
+    }
+    .num-pro-track input[type=range]::-moz-range-thumb {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 4px solid var(--bg);
+      box-shadow: 0 3px 10px rgba(63,107,58,0.45);
+      cursor: grab;
+    }
+    .num-pro-track input[type=range]:focus-visible {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+    .num-pro-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--text-soft);
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 420px) {
+      .num-pro { padding: 18px 14px; gap: 20px; }
+      .num-pro-value { font-size: 64px; letter-spacing: -1.8px; }
+      .num-pro-btn { width: 44px; height: 44px; }
+    }
+
     .wizard-bottom {
       flex: 0 0 auto;
       padding: 14px 18px;
@@ -3710,22 +3866,14 @@
        The heuristic delta below only tints the dashboard's preview;
        the trained ML model is scored from the wizard's signals.
        ========================================================= */
+    /* Tracker sections.
+       The daily check-in wizard already covers energy (feeling), stress
+       (slider), and work/study pressure (deadline_pressure slider) and
+       sleep hours — so we don't ask those again in the tracker.
+       The tracker focuses on lifestyle context the wizard does NOT ask:
+       sleep quality, hydration, movement, breaks, real rest, screen
+       time, caffeine, social connection, plus optional substance use. */
     const CHECKIN_SECTIONS = [
-      {
-        id: 'state',
-        title: "Today's State",
-        cards: [
-          { id: 'energy',     name: 'Energy',
-            q: "How's your energy today?",
-            opts: ['Drained', 'Low', 'Okay', 'Good', 'Energized'] },
-          { id: 'overwhelm',  name: 'Overwhelm',
-            q: 'How much pressure are you feeling?',
-            opts: ['Calm', 'Busy', 'Stressed', 'Overwhelmed'] },
-          { id: 'motivation', name: 'Motivation',
-            q: 'How hard is it to get things done?',
-            opts: ['Easy', 'Normal', 'Difficult', 'Very difficult'] },
-        ],
-      },
       {
         id: 'recovery',
         title: 'Recovery',
@@ -3738,25 +3886,26 @@
             opts: ['None', 'Light', 'Active'] },
           { id: 'breaks',       name: 'Breaks',
             opts: ['None', 'Some', 'Enough'] },
+          { id: 'recoveryTime', name: 'Real rest today',
+            opts: ['Real rest', 'Some', 'None'] },
         ],
       },
       {
-        id: 'load',
-        title: 'Stress Load',
+        id: 'habits',
+        title: 'Daily Habits',
         cards: [
-          { id: 'screenTime',        name: 'Screen Time',
+          { id: 'screenTime',       name: 'Screen Time',
             opts: ['Relaxing', 'Connecting', 'Avoidance', 'Late-night'] },
-          { id: 'caffeine',          name: 'Caffeine',
+          { id: 'caffeine',         name: 'Caffeine',
             opts: ['None', 'Low', 'Moderate', 'High'] },
-          { id: 'workStudyPressure', name: 'Work / Study Pressure',
-            opts: ['Low', 'Moderate', 'High', 'Extreme'] },
-          { id: 'socialConnection',  name: 'Social Connection',
+          { id: 'socialConnection', name: 'Social Connection',
             opts: ['Supportive', 'Neutral', 'Draining', 'Isolated'] },
-          { id: 'recoveryTime',      name: 'Recovery Time',
-            opts: ['Real rest', 'Some', 'None'] },
-          { id: 'alcohol',           name: 'Alcohol', muted: true,
+          { id: 'motivation',       name: 'Motivation',
+            q: 'How hard is it to get things done?',
+            opts: ['Easy', 'Normal', 'Difficult', 'Very difficult'] },
+          { id: 'alcohol',          name: 'Alcohol', muted: true,
             opts: ['None', 'Connected', 'To cope', 'Affected sleep'] },
-          { id: 'nicotine',          name: 'Nicotine', muted: true,
+          { id: 'nicotine',         name: 'Nicotine', muted: true,
             opts: ['None', 'Some', 'High'] },
         ],
       },
@@ -3765,9 +3914,11 @@
     // Per-option heuristic risk influence. Used only to nudge the
     // dashboard's "today's check-in" preview; the trained ML model
     // doesn't read these directly.
+    // Keys removed (`energy`, `overwhelm`, `workStudyPressure`) overlap
+    // with wizard questions — old stored values for those keys are
+    // silently ignored by `getTrackerToday` so the dashboard stays
+    // accurate after the cleanup.
     const CHECKIN_DELTA = {
-      energy:            { Drained: +0.05, Low: +0.025, Okay: 0, Good: -0.015, Energized: -0.03 },
-      overwhelm:         { Calm: -0.02, Busy: 0, Stressed: +0.025, Overwhelmed: +0.05 },
       motivation:        { Easy: -0.015, Normal: 0, Difficult: +0.02, 'Very difficult': +0.04 },
       sleepQuality:      { Poor: +0.03, Okay: 0, Good: -0.015, Great: -0.03 },
       hydration:         { Low: +0.015, Okay: 0, Good: -0.01 },
@@ -3775,7 +3926,6 @@
       breaks:            { None: +0.02, Some: 0, Enough: -0.015 },
       screenTime:        { Relaxing: 0, Connecting: -0.01, Avoidance: +0.025, 'Late-night': +0.04 },
       caffeine:          { None: 0, Low: 0, Moderate: 0, High: +0.02 },
-      workStudyPressure: { Low: -0.01, Moderate: 0, High: +0.025, Extreme: +0.05 },
       socialConnection:  { Supportive: -0.025, Neutral: 0, Draining: +0.025, Isolated: +0.035 },
       recoveryTime:      { 'Real rest': -0.035, Some: -0.01, None: +0.035 },
       alcohol:           { None: 0, Connected: -0.005, 'To cope': +0.035, 'Affected sleep': +0.045 },
@@ -5163,11 +5313,11 @@
         q: 'How supported by your care circle today?',
         loEnd: 'low', hiEnd: 'strong' },
       { id: 'feeling', kind: 'feeling',
-        q: 'Right now, how are you holding up?',
+        q: "How's your energy feeling right now?",
         hint: 'Your gut feeling matters.',
-        options: [{ v: 'fine', l: 'Fine' },
-                  { v: 'managing', l: 'Managing' },
-                  { v: 'burned', l: 'Burned out' }] },
+        options: [{ v: 'fine', l: 'Stable' },
+                  { v: 'managing', l: 'Drained' },
+                  { v: 'burned', l: 'Exhausted' }] },
       { id: 'events', kind: 'chips',
         q: 'Anything putting extra pressure on you recently?',
         hint: 'Pick anything that\u2019s been affecting your stress, energy, or routine lately.' },
@@ -5207,32 +5357,45 @@
         commit(cur + d);
       };
 
+      const pct = Math.max(0, Math.min(100,
+        ((Number(value) - min) / (max - min)) * 100));
+      const displayValue = (() => {
+        const n = parseFloat(text);
+        if (!Number.isFinite(n)) return String(value);
+        return step >= 1 ? String(Math.round(n)) : (Math.round(n * 2) / 2).toString();
+      })();
+
       return (
-        <div className="num-field">
-          {hint && <div className="field-hint">{hint}</div>}
-          <div className="num-field-row">
-            <button type="button" className="stepper-btn"
-                    onClick={() => bump(-step)}
-                    disabled={value <= min}>−</button>
-            <input type="text"
-                   inputMode="decimal"
-                   className="big-num-input"
-                   value={text}
-                   onChange={e => {
-                     const v = e.target.value.replace(/[^\d.]/g, '');
-                     setText(v);
-                     const n = parseFloat(v);
-                     if (Number.isFinite(n) && n >= min && n <= max) {
-                       lastCommitted.current = n;
-                       onChange(n);
-                     }
-                   }}
-                   onBlur={() => commit(text)} />
-            <button type="button" className="stepper-btn"
-                    onClick={() => bump(+step)}
-                    disabled={value >= max}>+</button>
+        <div className="num-pro">
+          <div className="num-pro-display">
+            <span className="num-pro-value">{displayValue}</span>
+            {label && <span className="num-pro-unit">{label}</span>}
           </div>
-          {label && <div className="num-unit">{label}</div>}
+
+          <div className="num-pro-control">
+            <button type="button" className="num-pro-btn"
+                    onClick={() => bump(-step)}
+                    disabled={value <= min}
+                    aria-label="Decrease">−</button>
+
+            <div className="num-pro-track">
+              <input type="range"
+                     min={min} max={max} step={step}
+                     value={Number.isFinite(parseFloat(text)) ? parseFloat(text) : value}
+                     style={{ ['--pct']: `${pct}%` }}
+                     onChange={e => commit(e.target.value)}
+                     aria-label={label || 'value'} />
+              <div className="num-pro-scale">
+                <span>{min}</span>
+                <span>{max}</span>
+              </div>
+            </div>
+
+            <button type="button" className="num-pro-btn"
+                    onClick={() => bump(+step)}
+                    disabled={value >= max}
+                    aria-label="Increase">+</button>
+          </div>
         </div>
       );
     }
@@ -5250,7 +5413,13 @@
                  min="1" max="10" step="1"
                  value={value}
                  style={{ ['--pct']: `${pct}%` }}
-                 onChange={e => onChange(+e.target.value)} />
+                 onChange={e => onChange(+e.target.value)}
+                 aria-label={`${loEnd} to ${hiEnd}`} />
+          <div className="big-slider-ticks" aria-hidden="true">
+            {Array.from({ length: 10 }, (_, i) => (
+              <span key={i} className={`tick ${i + 1 <= value ? 'on' : ''}`} />
+            ))}
+          </div>
           <div className="scale-ends">
             <span>{loEnd}</span>
             <span>{hiEnd}</span>
@@ -5816,6 +5985,41 @@
             step toward steadier days.
           </div>
 
+          {/* Burnout Risk ring — the headline number, kept at the
+              very top of Home so it's the first thing the user sees. */}
+          <div className="panel ring-card">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">Burnout Risk</div>
+                <div className="panel-sub">
+                  Patterns linked to emotional overload — not a diagnosis.
+                </div>
+              </div>
+            </div>
+            {hasData ? (
+              <>
+                <RiskRing pct={displayRisk} color={v.color} label={v.label} />
+                <div className="ring-foot">
+                  <span className="compare">{compareText}</span>
+                  <span className={`delta ${
+                    dailyDelta > 0.005 ? 'up'
+                    : dailyDelta < -0.005 ? 'down' : 'flat'}`}>
+                    {dailyDelta > 0.005
+                      ? `+${(dailyDelta * 100).toFixed(0)}% from today's check-in`
+                      : dailyDelta < -0.005
+                        ? `${(dailyDelta * 100).toFixed(0)}% from today's check-in`
+                        : 'No shift from today'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '24px 8px 4px', textAlign: 'center',
+                            color: 'var(--text-muted)' }}>
+                Your risk ring appears here once you've completed a check-in.
+              </div>
+            )}
+          </div>
+
           <div className="panel">
             <div className="panel-head">
               <div>
@@ -6180,41 +6384,10 @@
           </section>
 
           {/* ===========================================================
-              Dashboard / Insights (merged into Home)
+              Dashboard / Insights (merged into Home — the Burnout
+              Risk ring lives at the top of the page, this section
+              starts with the Strongest Area below it)
               =========================================================== */}
-          <div className="panel ring-card">
-            <div className="panel-head">
-              <div>
-                <div className="panel-title">Burnout Risk</div>
-                <div className="panel-sub">
-                  Patterns linked to emotional overload — not a diagnosis.
-                </div>
-              </div>
-            </div>
-            {hasData ? (
-              <>
-                <RiskRing pct={displayRisk} color={v.color} label={v.label} />
-                <div className="ring-foot">
-                  <span className="compare">{compareText}</span>
-                  <span className={`delta ${
-                    dailyDelta > 0.005 ? 'up'
-                    : dailyDelta < -0.005 ? 'down' : 'flat'}`}>
-                    {dailyDelta > 0.005
-                      ? `+${(dailyDelta * 100).toFixed(0)}% from today's check-in`
-                      : dailyDelta < -0.005
-                        ? `${(dailyDelta * 100).toFixed(0)}% from today's check-in`
-                        : 'No shift from today'}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div style={{ padding: '24px 8px 4px', textAlign: 'center',
-                            color: 'var(--text-muted)' }}>
-                Your risk ring appears here once you've completed a check-in.
-              </div>
-            )}
-          </div>
-
           {strongest && (
             <div className="panel strongest-area">
               <div className="strongest-eyebrow">
@@ -6951,9 +7124,10 @@
           <div className="eyebrow-pill">
             {todayLabel().toUpperCase()}
           </div>
-          <h1 className="display-title">Daily Check-In</h1>
+          <h1 className="display-title">Daily Tracker</h1>
           <div className="display-sub">
-            Track what's affecting your energy, stress, and recovery today.
+            Log the lifestyle factors that quietly shape your recovery —
+            sleep, breaks, screens, social load.
           </div>
 
           {CHECKIN_SECTIONS.map(sec => (
