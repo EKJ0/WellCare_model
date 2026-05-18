@@ -154,7 +154,7 @@
       border-bottom: 1px solid rgba(0,0,0,0.04);
       position: relative;
       z-index: 20;
-      view-transition-name: none;
+      view-transition-name: app-header;
     }
     .app-header h1 {
       font-size: 15px;
@@ -249,6 +249,20 @@
       }
     }
 
+    /* Header + bottom tabbar must NOT animate on tab change — they
+       are part of the persistent app chrome. They get their own named
+       snapshots so the root snapshot stops pulling them along. */
+    ::view-transition-group(app-header),
+    ::view-transition-group(app-tabbar),
+    ::view-transition-old(app-header),
+    ::view-transition-new(app-header),
+    ::view-transition-old(app-tabbar),
+    ::view-transition-new(app-tabbar),
+    ::view-transition-old(root),
+    ::view-transition-new(root) {
+      animation: none !important;
+    }
+
     @keyframes vt-tab-out {
       from { opacity: 1; transform: translateX(0); }
       to   { opacity: 0; transform: translateX(-10px); }
@@ -270,7 +284,7 @@
       justify-content: center;
       align-items: flex-end;
       pointer-events: none;
-      view-transition-name: none;
+      view-transition-name: app-tabbar;
     }
     .tabbar-dock .tabbar {
       pointer-events: auto;
@@ -294,15 +308,17 @@
       flex: 1;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 3px;
+      gap: 4px;
+      padding: 6px 4px;
       background: none; border: none;
-      font-size: 10.5px;
+      font-size: 11.5px;
       font-weight: 500;
+      letter-spacing: 0.1px;
       color: var(--text-soft);
       position: relative;
       transition: color 0.15s;
     }
-    .tab svg { width: 22px; height: 22px; }
+    .tab svg { width: 23px; height: 23px; }
     .tab.active { color: var(--primary); }
     /* Don't shift the dock when pressing tabs */
     .tab:active { transform: none; }
@@ -1805,29 +1821,59 @@
     .action-row:active { transform: scale(0.995); }
     .action-row .chev { color: var(--text-soft); flex-shrink: 0; }
 
-    .care-invite-row {
+    /* ---------- Care Circle: invite block ---------- */
+    .care-invite-block {
       display: grid;
-      grid-template-columns: minmax(130px, 0.9fr) minmax(180px, 1.6fr) auto;
-      gap: 8px;
-      align-items: stretch;
+      gap: 12px;
     }
     .care-create-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      min-height: 52px;
-      border-radius: 14px;
+      gap: 10px;
+      width: 100%;
+      min-height: 56px;
+      border-radius: 16px;
       border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
       background: linear-gradient(135deg, var(--primary), var(--primary-2));
       color: var(--on-primary);
       font-weight: 750;
-      box-shadow: 0 8px 20px rgba(63,107,58,0.26);
+      font-size: 15px;
+      box-shadow: 0 8px 22px rgba(63,107,58,0.26);
+      transition: filter 0.15s, transform 0.05s;
     }
-    .care-create-btn svg {
-      width: 17px;
-      height: 17px;
-      flex: 0 0 auto;
+    .care-create-btn:hover  { filter: brightness(1.05); }
+    .care-create-btn:active { transform: scale(0.99); }
+    .care-create-btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+    .care-create-hint {
+      font-size: 12.5px;
+      color: var(--text-soft);
+      text-align: center;
+      margin-top: -2px;
+    }
+    .care-invite-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-soft);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin: 2px 0;
+    }
+    .care-invite-divider::before,
+    .care-invite-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .care-invite-accept-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: stretch;
     }
     .care-invite-input {
       min-height: 52px;
@@ -1835,67 +1881,259 @@
     }
     .care-accept-btn {
       width: auto;
-      min-width: 86px;
+      min-width: 96px;
       min-height: 52px;
-      padding: 0 16px;
+      padding: 0 18px;
       border-radius: 14px;
     }
+
+    /* ---------- Care Circle: connection card (sharing modes) ---------- */
     .connection-card {
       display: grid;
-      grid-template-columns: minmax(120px, 1fr) minmax(230px, 1.25fr);
-      gap: 12px;
-      align-items: center;
-      padding: 12px;
+      gap: 14px;
+      padding: 16px;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      margin-bottom: 8px;
-      background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+      border-radius: 18px;
+      margin-bottom: 12px;
+      background: color-mix(in srgb, var(--surface) 96%, var(--bg));
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
     }
-    .connection-controls {
+    .conn-head {
       display: flex;
-      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .conn-head .name {
+      font-weight: 700;
+      font-size: 15.5px;
+      letter-spacing: -0.1px;
+    }
+    .conn-head .handle {
+      color: var(--text-soft);
+      font-size: 13px;
+      margin-top: 1px;
+    }
+    .conn-row {
+      display: grid;
+      gap: 6px;
+    }
+    .conn-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .conn-relationship-select {
+      min-height: 44px;
+      border-radius: 12px;
+    }
+    .mode-pills {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 4px;
+      background: color-mix(in srgb, var(--surface-2) 80%, var(--bg));
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+    .mode-pill {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-soft);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 9px 8px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      text-align: center;
+      line-height: 1.15;
+    }
+    .mode-pill:hover { color: var(--text); }
+    .mode-pill.active {
+      background: var(--surface);
+      color: var(--primary);
+      border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .mode-summary {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+      border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+      display: grid;
       gap: 8px;
-      min-width: 0;
+    }
+    .mode-summary .mode-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+    }
+    .mode-summary .mode-title svg {
+      width: 16px; height: 16px;
+      color: var(--primary);
+      flex: 0 0 auto;
+    }
+    .mode-summary .mode-desc {
+      font-size: 13px;
+      color: var(--text-soft);
+      line-height: 1.4;
+    }
+    .mode-summary .mode-sees {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .share-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .share-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+      color: var(--primary);
+      border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+      white-space: nowrap;
+    }
+    .share-pill svg { width: 11px; height: 11px; flex: 0 0 auto; }
+    .conn-privacy-note {
+      font-size: 12px;
+      color: var(--text-soft);
+      line-height: 1.45;
+      padding-left: 2px;
+    }
+    .customize-btn {
+      appearance: none;
+      background: transparent;
+      border: 1px dashed var(--border-strong);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .customize-btn:hover {
+      border-color: color-mix(in srgb, var(--primary) 45%, var(--border-strong));
+      background: color-mix(in srgb, var(--primary) 5%, transparent);
+    }
+    .customize-btn .chev {
+      transition: transform 0.2s;
+    }
+    .customize-btn[aria-expanded="true"] .chev {
+      transform: rotate(180deg);
+    }
+    .customize-panel {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--surface-2) 60%, var(--bg));
+      border: 1px solid var(--border);
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 2px;
+    }
+    .toggle-row + .toggle-row {
+      border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    }
+    .toggle-row .lbl {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    /* Modern switch toggle (replaces square checkboxes) */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+      flex: 0 0 auto;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: color-mix(in srgb, var(--text-soft) 35%, var(--border));
+      border-radius: 999px;
+      transition: background 0.2s;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .switch input:checked + .slider {
+      background: var(--primary);
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(18px);
+    }
+    .switch input:focus-visible + .slider {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
     }
     .threshold-control {
       display: grid;
-      grid-template-columns: 1fr 50px;
+      grid-template-columns: 1fr 56px;
       gap: 10px;
       align-items: center;
+      padding-top: 4px;
     }
     .threshold-control input[type=range] {
       width: 100%;
       min-width: 0;
       cursor: pointer;
+      accent-color: var(--primary);
     }
-    .share-options {
-      display: grid;
-      gap: 7px;
-      font-size: 13px;
+    .threshold-control .val {
+      text-align: right;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
-    .share-options label {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      cursor: pointer;
-      user-select: none;
+    .threshold-hint {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-top: 2px;
     }
-    .share-options input[type=checkbox] {
-      width: 17px;
-      height: 17px;
-      flex: 0 0 auto;
-      cursor: pointer;
-    }
-    @media (max-width: 560px) {
-      .care-invite-row {
-        grid-template-columns: 1fr auto;
-      }
-      .care-create-btn {
-        grid-column: 1 / -1;
-      }
-      .connection-card {
-        grid-template-columns: 1fr;
-      }
+
+    @media (max-width: 480px) {
+      .mode-pill { font-size: 12.5px; padding: 9px 4px; }
+      .care-invite-accept-row { grid-template-columns: 1fr; }
+      .care-accept-btn { width: 100%; }
     }
 
     /* Where scoring data / model bundle are loaded from (visible audit trail) */
@@ -3648,9 +3886,108 @@
       last_checkin: true,
       top_contributors: false,
       recovery_status: false,
+      important_updates: true,
       private_answers: false,
       notes: false,
     };
+
+    /* ---------------------------------------------------------------
+       Sharing-mode presets.
+       A "mode" is a friendly name for a permission preset. Trusted
+       connections always store full per-permission settings, but the
+       UI lets the user pick a mode and we apply the matching preset.
+       If the user manually toggles anything that drifts from a preset,
+       the connection becomes "custom".
+       --------------------------------------------------------------- */
+    const SHARING_MODES = {
+      minimal: {
+        label: 'Minimal',
+        tagline: 'Critical alerts only',
+        description: 'Only sends critical alerts when you may need support.',
+        pills: ['High-risk alerts', 'Last safety update'],
+        permissions: {
+          risk: false,
+          level: true,
+          trend: false,
+          last_checkin: true,
+          top_contributors: false,
+          recovery_status: false,
+          important_updates: true,
+          private_answers: false,
+          notes: false,
+        },
+        notificationEnabled: true,
+        alertThreshold: 0.80,
+      },
+      supportive: {
+        label: 'Supportive',
+        tagline: 'Balanced support',
+        description: 'Balanced sharing for trusted support without oversharing.',
+        pills: ['Burnout trend', 'Recovery status', 'Important updates'],
+        permissions: {
+          risk: false,
+          level: true,
+          trend: true,
+          last_checkin: true,
+          top_contributors: false,
+          recovery_status: true,
+          important_updates: true,
+          private_answers: false,
+          notes: false,
+        },
+        notificationEnabled: true,
+        alertThreshold: 0.70,
+      },
+      full: {
+        label: 'Full Support',
+        tagline: 'Deep wellbeing context',
+        description: 'Shares deeper wellbeing context for close trusted people.',
+        pills: ['Burnout %', 'Trend', 'Recovery status', 'Top contributors', 'Last update', 'Important alerts'],
+        permissions: {
+          risk: true,
+          level: true,
+          trend: true,
+          last_checkin: true,
+          top_contributors: true,
+          recovery_status: true,
+          important_updates: true,
+          private_answers: false,
+          notes: false,
+        },
+        notificationEnabled: true,
+        alertThreshold: 0.60,
+      },
+    };
+    const DEFAULT_SHARING_MODE = 'supportive';
+
+    /** Return mode id whose preset matches current connection, or 'custom'. */
+    function inferSharingMode(conn) {
+      const share = normalizeShareSettings(conn.share);
+      const notif = conn.notificationEnabled !== false;
+      const thr = +conn.alertThreshold;
+      for (const [id, preset] of Object.entries(SHARING_MODES)) {
+        const permMatch = Object.keys(preset.permissions)
+          .every(k => !!share[k] === !!preset.permissions[k]);
+        const notifMatch = notif === preset.notificationEnabled;
+        const thrMatch = Number.isFinite(thr)
+          ? Math.abs(thr - preset.alertThreshold) < 0.005
+          : true;
+        if (permMatch && notifMatch && thrMatch) return id;
+      }
+      return 'custom';
+    }
+
+    /** Patch to apply when switching a connection to a given mode. */
+    function patchForMode(modeId) {
+      const preset = SHARING_MODES[modeId];
+      if (!preset) return {};
+      return {
+        share: { ...preset.permissions },
+        notificationEnabled: preset.notificationEnabled,
+        alertThreshold: preset.alertThreshold,
+        sharingMode: modeId,
+      };
+    }
     const ACCEPTED_CONNECTION_STATUSES = new Set(['accepted', 'active']);
 
     function normalizeShareSettings(share) {
@@ -3658,14 +3995,21 @@
     }
     function normalizeConnection(c) {
       const status = c.status === 'active' ? 'accepted' : (c.status || 'accepted');
-      return {
+      // If a stored connection has no explicit sharingMode yet, infer it
+      // from its current permissions (falls back to DEFAULT_SHARING_MODE
+      // when the connection is brand new with no share settings).
+      const seedHasShareInfo = c && (c.share || Number.isFinite(+c.alertThreshold));
+      const base = {
         ...c,
         status,
         relationship: c.relationship || 'Friend',
-        alertThreshold: Number.isFinite(+c.alertThreshold) ? +c.alertThreshold : 0.75,
-        share: normalizeShareSettings(c.share),
+        alertThreshold: Number.isFinite(+c.alertThreshold) ? +c.alertThreshold : SHARING_MODES[DEFAULT_SHARING_MODE].alertThreshold,
+        share: normalizeShareSettings(c.share || (seedHasShareInfo ? {} : SHARING_MODES[DEFAULT_SHARING_MODE].permissions)),
         notificationEnabled: c.notificationEnabled !== false,
       };
+      const explicit = typeof c.sharingMode === 'string' && (SHARING_MODES[c.sharingMode] || c.sharingMode === 'custom');
+      base.sharingMode = explicit ? c.sharingMode : inferSharingMode(base);
+      return base;
     }
     function isAcceptedConnection(c) {
       return ACCEPTED_CONNECTION_STATUSES.has((c.status || '').toLowerCase());
@@ -3768,14 +4112,31 @@
       try { sessionStorage.removeItem(PENDING_INVITE_KEY); } catch {}
     }
 
-    async function createInviteToken(fromProfile) {
+    async function createInviteToken(fromProfile, options) {
+      const sharingMode = (options && options.sharingMode) || DEFAULT_SHARING_MODE;
+      const preset = SHARING_MODES[sharingMode] || SHARING_MODES[DEFAULT_SHARING_MODE];
+      const inviteBody = {
+        from: { personId: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '' },
+        sharingMode,
+        share: preset.permissions,
+        alertThreshold: preset.alertThreshold,
+        notificationEnabled: preset.notificationEnabled,
+      };
       // Try server-issued token first, fallback to local base64 token when unavailable
       try {
-        const resp = await fetch('/api/invite/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: { personId: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '' } }) });
+        const resp = await fetch('/api/invite/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inviteBody) });
         if (resp.ok) { const j = await resp.json(); if (j && j.token) return j.token; }
       } catch (e) { /* ignore, fallback below */ }
       try {
-        const payload = { from: fromProfile.personId || fromProfile.id || 'unknown', name: fromProfile.name || '', ts: Date.now() };
+        const payload = {
+          from: fromProfile.personId || fromProfile.id || 'unknown',
+          name: fromProfile.name || '',
+          sharingMode,
+          share: preset.permissions,
+          alertThreshold: preset.alertThreshold,
+          notificationEnabled: preset.notificationEnabled,
+          ts: Date.now(),
+        };
         return encodeLocalInvitePayload(payload);
       } catch { return ''; }
     }
@@ -3788,14 +4149,18 @@
         if (resp.ok) {
           const j = await resp.json();
           if (j && j.connection) {
+            const incomingMode = j.connection.sharingMode || DEFAULT_SHARING_MODE;
+            const preset = SHARING_MODES[incomingMode] || SHARING_MODES[DEFAULT_SHARING_MODE];
             const rec = normalizeConnection({
               id: j.connection.id || (`${j.connection.personId}-${Math.floor(Math.random()*100000)}`),
               personId: j.connection.personId,
               name: j.connection.name || j.connection.personId,
               status: 'accepted',
               relationship: j.connection.relationship || 'Friend',
-              alertThreshold: j.connection.alertThreshold || 0.75,
-              share: j.connection.share,
+              alertThreshold: j.connection.alertThreshold || preset.alertThreshold,
+              share: j.connection.share || preset.permissions,
+              notificationEnabled: j.connection.notificationEnabled !== false,
+              sharingMode: incomingMode,
               created_at: Date.now(),
             });
             upsertConnection(rec);
@@ -3806,8 +4171,21 @@
       } catch (e) { /* continue to local fallback */ }
       try {
         const obj = decodeLocalInvitePayload(token);
+        const incomingMode = obj.sharingMode || DEFAULT_SHARING_MODE;
+        const preset = SHARING_MODES[incomingMode] || SHARING_MODES[DEFAULT_SHARING_MODE];
         const id = `${obj.from}-${Math.floor(Math.random()*100000)}`;
-        const rec = normalizeConnection({ id, personId: obj.from, name: obj.name || obj.from, status: 'accepted', relationship: 'Friend', alertThreshold: 0.75, created_at: Date.now() });
+        const rec = normalizeConnection({
+          id,
+          personId: obj.from,
+          name: obj.name || obj.from,
+          status: 'accepted',
+          relationship: 'Friend',
+          alertThreshold: obj.alertThreshold || preset.alertThreshold,
+          share: obj.share || preset.permissions,
+          notificationEnabled: obj.notificationEnabled !== false,
+          sharingMode: incomingMode,
+          created_at: Date.now(),
+        });
         upsertConnection(rec);
         pushNotification(`${rec.name} joined your Care Circle`);
         return rec;
@@ -5266,12 +5644,43 @@
     /* =========================================================
        TAB CONTENT — Home
        ========================================================= */
-    function HomeTab({ activeProfile, personHist, stats,
-                       onStartCheckin, onGoDashboard, onGoTracker }) {
+    function HomeTab({ activeProfile, personHist, stats, insights,
+                       onStartCheckin, onGoTracker }) {
       const thisWeekKey = isoDate(new Date());
       const thisWeek = personHist.find(e =>
         isoDate(new Date(e.when)) === thisWeekKey);
       const firstName = activeProfile.name.split(' ')[0];
+
+      /* ---------- Dashboard data (merged from the old Insights tab) ---------- */
+      const trackerToday  = getTrackerToday(activeProfile.personId);
+      const dailyDelta    = trackerDelta(trackerToday);
+      const hasData       = personHist.length > 0;
+      const latest        = personHist[0];
+      const baseRisk      = latest ? latest.risk : 0;
+      const displayRisk   = Math.max(0, Math.min(1, baseRisk + dailyDelta));
+      const v             = verdict(Math.max(0.001, displayRisk));
+
+      // 7-day vs previous-7-day comparator.
+      let compareText = 'no comparison yet';
+      if (personHist.length >= 2) {
+        const recent = personHist.slice(0, Math.min(7, personHist.length));
+        const older  = personHist.slice(7, Math.min(14, personHist.length));
+        if (older.length > 0) {
+          const avg = a => a.reduce((s, e) => s + e.risk, 0) / a.length;
+          const diff = avg(recent) - avg(older);
+          if (Math.abs(diff) < 0.03)      compareText = 'stable vs previous days';
+          else if (diff > 0)              compareText = `+${(diff * 100).toFixed(0)}% vs previous days`;
+          else                            compareText = `${(diff * 100).toFixed(0)}% vs previous days`;
+        }
+      }
+
+      const chartData = personHist
+        .slice(0, 30)
+        .map(e => ({ date: e.when, risk: e.risk }))
+        .reverse();
+      const dims      = computeDimensions(personHist);
+      const strongest = strongestDimension(dims);
+      const personId  = activeProfile.personId;
 
       const snPanelRef = React.useRef(null);
 
@@ -5427,7 +5836,7 @@
               </button>
             </div>
 
-              <button className="sub-card" onClick={onGoDashboard}>
+            <div className="sub-card" style={{ cursor: 'default' }}>
               <div className="label">
                 <svg viewBox="0 0 24 24" fill="none">
                   <rect x="4" y="5" width="16" height="15" rx="2"
@@ -5442,21 +5851,7 @@
                   ? `${stats.streak} check-in${stats.streak === 1 ? '' : 's'} in a row — keep it up.`
                   : 'Your streak appears here once you check in a few days in a row.'}
               </div>
-            </button>
-
-            <button className="sub-card" onClick={onGoDashboard}>
-              <div className="label">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M4 20V10 M10 20V6 M16 20v-9 M22 20v-5"
-                        stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                Trend over time
-              </div>
-              <div className="desc">
-                See your burnout risk curve and what's shifting it.
-              </div>
-            </button>
-
+            </div>
           </div>
 
           {/* =========================================================
@@ -5784,33 +6179,169 @@
             </p>
           </section>
 
+          {/* ===========================================================
+              Dashboard / Insights (merged into Home)
+              =========================================================== */}
+          <div className="panel ring-card">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">Burnout Risk</div>
+                <div className="panel-sub">
+                  Patterns linked to emotional overload — not a diagnosis.
+                </div>
+              </div>
+            </div>
+            {hasData ? (
+              <>
+                <RiskRing pct={displayRisk} color={v.color} label={v.label} />
+                <div className="ring-foot">
+                  <span className="compare">{compareText}</span>
+                  <span className={`delta ${
+                    dailyDelta > 0.005 ? 'up'
+                    : dailyDelta < -0.005 ? 'down' : 'flat'}`}>
+                    {dailyDelta > 0.005
+                      ? `+${(dailyDelta * 100).toFixed(0)}% from today's check-in`
+                      : dailyDelta < -0.005
+                        ? `${(dailyDelta * 100).toFixed(0)}% from today's check-in`
+                        : 'No shift from today'}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '24px 8px 4px', textAlign: 'center',
+                            color: 'var(--text-muted)' }}>
+                Your risk ring appears here once you've completed a check-in.
+              </div>
+            )}
+          </div>
+
+          {strongest && (
+            <div className="panel strongest-area">
+              <div className="strongest-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9"
+                          stroke="currentColor" strokeWidth="1.8"/>
+                  <circle cx="12" cy="12" r="4.5"
+                          stroke="currentColor" strokeWidth="1.8"/>
+                  <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+                </svg>
+                Strongest Area
+              </div>
+              <div className="panel-title">{strongest.name}</div>
+              <div className="panel-sub">
+                Avg: {fmtDimValue(strongest, strongest.avg)}
+                {strongest.unit === '/10' ? '/10' : ''}
+                {strongest.direction === -1 ? ' · lower is better' : ''}
+              </div>
+            </div>
+          )}
+
+          <div className="panel trend-card">
+            <div className="head-row">
+              <div className="h">Burnout Risk Over Time</div>
+            </div>
+            <div className="sub">
+              Your pattern becomes clearer as you check in over time.
+            </div>
+            <TrendChart data={chartData} />
+          </div>
+
+          {dims.length > 0 && (
+            <div className="panel">
+              <div className="panel-head">
+                <div className="panel-title">Your latest check-in</div>
+              </div>
+              <div className="panel-sub" style={{ marginBottom: 14 }}>
+                The exact values you reported — same scale as the questions.
+              </div>
+              {dims.map(d => {
+                const range = d.max - d.min;
+                const relLatest = range > 0
+                  ? Math.max(0, Math.min(1, (d.latest - d.min) / range)) : 0;
+                const relAvg = range > 0
+                  ? Math.max(0, Math.min(1, (d.avg - d.min) / range)) : 0;
+                const showAvg = d.count > 1
+                  && Math.abs(d.latest - d.avg) > (d.unit === 'h' ? 0.25 : 0.1);
+                return (
+                  <div key={d.id} className="dim-row">
+                    <div className="dim-label">{d.name}</div>
+                    <div className="dim-value">{fmtDimValue(d, d.latest)}</div>
+                    <div className="dim-bar">
+                      <span style={{ width: `${Math.max(2, relLatest * 100)}%` }} />
+                      {d.count > 1 && (
+                        <i className="dim-avg-tick"
+                           style={{ left: `${relAvg * 100}%` }}
+                           title={`${d.count}-check-in average`} />
+                      )}
+                    </div>
+                    <div className="dim-foot">
+                      <span className="end">{d.loEnd}</span>
+                      {showAvg && (
+                        <span className="avg">
+                          {d.count}-check-in avg · {fmtDimValue(d, d.avg)}
+                        </span>
+                      )}
+                      <span className="end">{d.hiEnd}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {Array.isArray(insights) && insights.length > 0 && (
+            <div className="panel">
+              <div className="panel-head">
+                <div className="panel-title">What we noticed</div>
+              </div>
+              <div className="insights-list">
+                {insights.map((ins, i) => (
+                  <div key={i} className={`insight ${ins.kind}`}>
+                    <div className="insight-icon">
+                      {ins.kind === 'good' ? '↓'
+                        : ins.kind === 'bad' ? '↑'
+                        : ins.kind === 'warn' ? '!' : '·'}
+                    </div>
+                    <span>{ins.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title">Quick actions</div>
+              <div className="panel-title">History</div>
             </div>
-            <button className="action-row" onClick={onGoDashboard}>
-              <span>Go to dashboard</span>
-              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button className="action-row" onClick={onGoTracker}>
-              <span>Open daily tracker</span>
-              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button type="button" className="action-row"
-                    onClick={scrollToSafetyNet}>
-              <span>Manage trusted contacts</span>
-              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
-                      strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+            {personHist.length === 0 ? (
+              <div style={{ color: 'var(--text-soft)', fontSize: 14 }}>
+                No entries yet for {personId}.
+              </div>
+            ) : (
+              <ul className="mini-list">
+                {personHist.map((e, idx) => {
+                  const isLatestToday = idx === 0
+                    && typeof e.when === 'string'
+                    && e.when.slice(0, 10) === todayKey();
+                  const shownRisk = isLatestToday ? displayRisk : e.risk;
+                  const ev = verdict(shownRisk);
+                  return (
+                    <li key={e.id} className="mini-item">
+                      <div className="mini-date">
+                        <div className="when">{shortDate(e.when)}</div>
+                        {e.notes && <div className="note">"{e.notes}"</div>}
+                      </div>
+                      <span className="mini-tag" style={{ color: ev.color }}>{ev.label}</span>
+                      <span className="mini-pct" style={{ color: ev.color }}>
+                        {(shownRisk * 100).toFixed(0)}%
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
+
         </div>
       );
     }
@@ -6722,6 +7253,221 @@
     }
 
     /* =========================================================
+       Sharing-mode UI — shared by Profile (and any other screen
+       that surfaces trusted-person sharing controls).
+       ========================================================= */
+    function ShieldIcon() {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"
+                stroke="currentColor" strokeWidth="1.7"
+                strokeLinejoin="round" />
+          <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.7"
+                strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    }
+    function ChevDown() {
+      return (
+        <svg className="chev" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    }
+    function CheckTinyIcon() {
+      return (
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M5 12l5 5 9-11" stroke="currentColor" strokeWidth="2.4"
+                strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    }
+
+    /** Friendly label for an advanced share permission. */
+    const ADVANCED_TOGGLES = [
+      { key: 'notificationEnabled', label: 'Notifications' },
+      { key: 'risk',                label: 'Share risk %' },
+      { key: 'trend',               label: 'Share trend' },
+      { key: 'last_checkin',        label: 'Share last update' },
+      { key: 'top_contributors',    label: 'Share top contributors' },
+      { key: 'recovery_status',     label: 'Share recovery status' },
+      { key: 'important_updates',   label: 'Share important updates' },
+    ];
+
+    /**
+     * Trusted-person card with sharing-mode UI.
+     * Replaces the old checkbox-heavy permissions list.
+     */
+    function ConnectionCard({ conn, onUpdate }) {
+      const [showAdvanced, setShowAdvanced] = useState(false);
+      const currentMode = conn.sharingMode || inferSharingMode(conn);
+      const presetForCurrent = SHARING_MODES[currentMode];
+
+      const pickMode = (modeId) => {
+        onUpdate(conn.id, patchForMode(modeId));
+      };
+
+      // A change to any advanced toggle should mark the connection as
+      // "custom" unless the resulting permissions happen to match a preset.
+      const toggleAdvanced = (key, value) => {
+        if (key === 'notificationEnabled') {
+          const next = normalizeConnection({
+            ...conn,
+            notificationEnabled: value,
+            sharingMode: undefined,
+          });
+          onUpdate(conn.id, {
+            notificationEnabled: value,
+            sharingMode: next.sharingMode,
+          });
+        } else {
+          const nextShare = { ...normalizeShareSettings(conn.share), [key]: value };
+          const next = normalizeConnection({
+            ...conn,
+            share: nextShare,
+            sharingMode: undefined,
+          });
+          onUpdate(conn.id, {
+            share: nextShare,
+            sharingMode: next.sharingMode,
+          });
+        }
+      };
+
+      const setThreshold = (value) => {
+        const next = normalizeConnection({
+          ...conn,
+          alertThreshold: value,
+          sharingMode: undefined,
+        });
+        onUpdate(conn.id, {
+          alertThreshold: value,
+          sharingMode: next.sharingMode,
+        });
+      };
+
+      const handle = conn.personId ? `@${String(conn.personId).replace(/^@/, '')}` : '';
+
+      return (
+        <div className="connection-card">
+          <div className="conn-head">
+            <Avatar name={conn.name} color={conn.color || colorFor(conn.name)} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="name">{conn.name}</div>
+              {handle && <div className="handle">{handle}</div>}
+            </div>
+          </div>
+
+          <div className="conn-row">
+            <div className="conn-label">Relationship</div>
+            <select className="text-input conn-relationship-select"
+                    value={conn.relationship || 'Friend'}
+                    onChange={e => onUpdate(conn.id, { relationship: e.target.value })}>
+              <option>Friend</option>
+              <option>Partner</option>
+              <option>Family</option>
+              <option>Coach</option>
+            </select>
+          </div>
+
+          <div className="conn-row">
+            <div className="conn-label">Sharing Mode</div>
+            <div className="mode-pills" role="tablist" aria-label="Sharing mode">
+              {Object.entries(SHARING_MODES).map(([id, preset]) => (
+                <button key={id} type="button" role="tab"
+                        aria-selected={currentMode === id}
+                        className={`mode-pill ${currentMode === id ? 'active' : ''}`}
+                        onClick={() => pickMode(id)}>
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mode-summary" aria-live="polite">
+            <div className="mode-title">
+              <ShieldIcon />
+              <span>
+                {presetForCurrent ? `${presetForCurrent.label} sharing` : 'Custom sharing'}
+              </span>
+            </div>
+            <div className="mode-desc">
+              {presetForCurrent
+                ? presetForCurrent.description
+                : 'You have customised what this person can see.'}
+            </div>
+            <div className="mode-sees">{conn.name} can see:</div>
+            <div className="share-pill-row">
+              {(presetForCurrent ? presetForCurrent.pills : pillsFromShare(conn)).map((p, i) => (
+                <span key={i} className="share-pill">
+                  <CheckTinyIcon />{p}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <button type="button"
+                  className="customize-btn"
+                  aria-expanded={showAdvanced}
+                  onClick={() => setShowAdvanced(v => !v)}>
+            <span>{showAdvanced ? 'Hide customisation' : 'Customise details'}</span>
+            <ChevDown />
+          </button>
+
+          {showAdvanced && (
+            <div className="customize-panel">
+              {ADVANCED_TOGGLES.map(({ key, label }) => {
+                const checked = key === 'notificationEnabled'
+                  ? conn.notificationEnabled !== false
+                  : !!normalizeShareSettings(conn.share)[key];
+                return (
+                  <div key={key} className="toggle-row">
+                    <span className="lbl">{label}</span>
+                    <label className="switch">
+                      <input type="checkbox" checked={checked}
+                             onChange={e => toggleAdvanced(key, e.target.checked)} />
+                      <span className="slider" />
+                    </label>
+                  </div>
+                );
+              })}
+
+              <div className="conn-row" style={{ marginTop: 4 }}>
+                <div className="conn-label">Alert sensitivity</div>
+                <div className="threshold-control">
+                  <input type="range" min="0.45" max="0.95" step="0.01"
+                         value={conn.alertThreshold || 0.75}
+                         onChange={e => setThreshold(parseFloat(e.target.value))} />
+                  <div className="val">{Math.round((conn.alertThreshold || 0.75) * 100)}%</div>
+                </div>
+                <div className="threshold-hint">
+                  Trusted person is alerted when risk reaches this level.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /** Build pills for a "custom" sharing configuration from raw share flags. */
+    function pillsFromShare(conn) {
+      const s = normalizeShareSettings(conn.share);
+      const out = [];
+      if (s.risk)              out.push('Burnout %');
+      else if (s.level)        out.push('Risk level');
+      if (s.trend)             out.push('Trend');
+      if (s.recovery_status)   out.push('Recovery status');
+      if (s.top_contributors)  out.push('Top contributors');
+      if (s.last_checkin)      out.push('Last update');
+      if (s.important_updates) out.push('Important updates');
+      if (!out.length)         out.push('Nothing yet');
+      return out;
+    }
+
+    /* =========================================================
        TAB CONTENT — Profile / Settings
        ========================================================= */
     function ProfileTab({
@@ -6886,80 +7632,48 @@
             <div className="panel-head">
               <div className="panel-title">Care Circle</div>
             </div>
-            <div style={{ paddingTop: 8, display: 'grid', gap: 10 }}>
-              <div className="care-invite-row">
+            <div style={{ paddingTop: 8, display: 'grid', gap: 14 }}>
+              {/* Invite block — Create is its own prominent action,
+                  Paste + Accept live below a divider so it's clear they
+                  belong to a different flow. */}
+              <div className="care-invite-block">
                 <button className="care-create-btn" onClick={handleCreateInvite}>
                   <svg viewBox="0 0 24 24" fill="none">
                     <path d="M12 5v14M5 12h14"
                           stroke="currentColor" strokeWidth="2.2"
                           strokeLinecap="round" />
                   </svg>
-                  <span>Create invite</span>
+                  <span>Create invite link</span>
                 </button>
-                <input className="text-input care-invite-input" placeholder="Paste invite link or code"
-                       value={inviteInput} onChange={e => setInviteInput(e.target.value)} />
-                <button className="cta care-accept-btn" onClick={handleAcceptInvite}>Accept</button>
+                <div className="care-create-hint">
+                  Generates a private link you can share with a trusted person.
+                </div>
+
+                <div className="care-invite-divider">Have an invite?</div>
+
+                <div className="care-invite-accept-row">
+                  <input className="text-input care-invite-input"
+                         placeholder="Paste invite link or code"
+                         value={inviteInput}
+                         onChange={e => setInviteInput(e.target.value)} />
+                  <button className="cta care-accept-btn"
+                          onClick={handleAcceptInvite}>Accept</button>
+                </div>
               </div>
 
               <div>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Your connections</div>
+                <div className="conn-privacy-note" style={{ marginBottom: 10 }}>
+                  You control what each person can see. You can change or
+                  remove access anytime.
+                </div>
                 {profileConnections.length === 0 && (
-                  <div style={{ color: 'var(--text-soft)' }}>No connections yet — create or accept an invite.</div>
+                  <div style={{ color: 'var(--text-soft)' }}>
+                    No connections yet — create or accept an invite.
+                  </div>
                 )}
                 {profileConnections.map(c => (
-                  <div key={c.id} className="connection-card">
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700 }}>{c.name}</div>
-                      <div style={{ color: 'var(--text-soft)', fontSize: 13 }}>
-                        {c.personId}
-                      </div>
-                    </div>
-                    <div className="connection-controls">
-                      <select className="text-input" value={c.relationship || 'Friend'} onChange={e => updateConnection(c.id, { relationship: e.target.value })}>
-                        <option>Friend</option>
-                        <option>Partner</option>
-                        <option>Family</option>
-                        <option>Coach</option>
-                      </select>
-                      <div className="threshold-control">
-                        <input type="range" min="0" max="1" step="0.01" value={c.alertThreshold || 0.75}
-                               onChange={e => updateConnection(c.id, { alertThreshold: parseFloat(e.target.value) })} />
-                        <div style={{ textAlign: 'right', fontWeight: 700 }}>{Math.round((c.alertThreshold || 0.75)*100)}%</div>
-                      </div>
-                      <div className="share-options">
-                        <label>
-                          <input type="checkbox" checked={c.notificationEnabled !== false}
-                                 onChange={e => updateConnection(c.id, { notificationEnabled: e.target.checked })} />
-                          Notifications
-                        </label>
-                        <label>
-                          <input type="checkbox" checked={(c.share && c.share.risk) ?? true}
-                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), risk: e.target.checked } })} />
-                          Share risk %
-                        </label>
-                        <label>
-                          <input type="checkbox" checked={(c.share && c.share.trend) ?? true}
-                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), trend: e.target.checked } })} />
-                          Share trend
-                        </label>
-                        <label>
-                          <input type="checkbox" checked={(c.share && c.share.last_checkin) ?? true}
-                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), last_checkin: e.target.checked } })} />
-                          Share last update
-                        </label>
-                        <label>
-                          <input type="checkbox" checked={(c.share && c.share.top_contributors) ?? false}
-                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), top_contributors: e.target.checked } })} />
-                          Share top contributors
-                        </label>
-                        <label>
-                          <input type="checkbox" checked={(c.share && c.share.recovery_status) ?? false}
-                                 onChange={e => updateConnection(c.id, { share: { ...(c.share||{}), recovery_status: e.target.checked } })} />
-                          Share recovery status
-                        </label>
-                      </div>
-                    </div>
-                  </div>
+                  <ConnectionCard key={c.id} conn={c} onUpdate={updateConnection} />
                 ))}
               </div>
             </div>
@@ -7031,14 +7745,14 @@
        APP — top-level state machine
        ========================================================= */
     const TABS = [
-      { id: 'home',     label: 'Home' },
-      { id: 'insights', label: 'Insights' },
-      { id: 'care',     label: 'Care Circle' },
-      { id: 'profile',  label: 'Profile' },
+      { id: 'home',    label: 'Home' },
+      { id: 'care',    label: 'Care Circle' },
+      { id: 'tracker', label: 'Tracker' },
+      { id: 'profile', label: 'Profile' },
     ];
 
     /** Tab bar order — used for subtle slide direction on change */
-    const MAIN_TAB_ORDER = ['home', 'insights', 'care', 'tracker', 'profile'];
+    const MAIN_TAB_ORDER = ['home', 'care', 'tracker', 'profile'];
     const SUPPORTS_VIEW_TRANSITION =
       typeof document !== 'undefined'
       && typeof document.startViewTransition === 'function';
@@ -7692,18 +8406,9 @@
                   activeProfile={activeProfile}
                   personHist={personHist}
                   stats={stats}
-                  onStartCheckin={startCheckin}
-                  onGoDashboard={() => goTab('insights')}
-                  onGoTracker={() => goTab('tracker')}
-                />
-              )}
-              {tab === 'insights' && (
-                <InsightsTab
-                  personHist={personHist}
-                  stats={stats}
                   insights={insights}
-                  personId={activeProfile.personId}
-                  activeProfile={activeProfile}
+                  onStartCheckin={startCheckin}
+                  onGoTracker={() => goTab('tracker')}
                 />
               )}
               {tab === 'care' && (
@@ -7750,12 +8455,6 @@
                       onClick={() => goTab('home')}>
                 {tabIcons.home(tab === 'home')}
                 <span>Home</span>
-              </button>
-              <button type="button"
-                      className={`tab ${tab === 'insights' ? 'active' : ''}`}
-                      onClick={() => goTab('insights')}>
-                {tabIcons.insights(tab === 'insights')}
-                <span>Dashboard</span>
               </button>
               <button type="button"
                       className={`tab ${tab === 'care' ? 'active' : ''}`}
