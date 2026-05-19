@@ -8,8 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#3F6B3A">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" href="wellcare-logo.png">
-  <link rel="apple-touch-icon" href="wellcare-logo.png">
+  <link rel="icon" type="image/svg+xml" href="wellcare-logo.svg">
+  <link rel="apple-touch-icon" href="wellcare-logo.svg">
   <title>WellCare — daily burnout check-in</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous">
@@ -205,29 +205,32 @@
     .tab-page.vt-root {
       view-transition-name: app-tab-pane;
       min-height: 100%;
+      transform: translateZ(0);
+      will-change: transform, opacity;
+      contain: layout paint;
     }
 
     @keyframes tab-enter-fwd {
-      from { opacity: 0; transform: translateX(14px); }
-      to   { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; transform: translate3d(22px, 0, 0); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
     @keyframes tab-enter-back {
-      from { opacity: 0; transform: translateX(-14px); }
-      to   { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; transform: translate3d(-22px, 0, 0); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
     @keyframes tab-enter-fade {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translate3d(0, 8px, 0); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0); }
     }
 
     .tab-page.tab-fallback.tab-dir-fwd {
-      animation: tab-enter-fwd 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: tab-enter-fwd 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .tab-page.tab-fallback.tab-dir-back {
-      animation: tab-enter-back 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: tab-enter-back 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     .tab-page.tab-fallback.tab-dir-neutral {
-      animation: tab-enter-fade 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation: tab-enter-fade 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -241,11 +244,27 @@
     }
 
     @media (prefers-reduced-motion: no-preference) {
+      :root {
+        --tab-in-x: 26px;
+        --tab-out-x: -18px;
+      }
+      :root[data-tab-dir="back"] {
+        --tab-in-x: -26px;
+        --tab-out-x: 18px;
+      }
+      :root[data-tab-dir="neutral"] {
+        --tab-in-x: 0;
+        --tab-out-x: 0;
+      }
+      ::view-transition-group(app-tab-pane) {
+        animation-duration: 0.54s;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+      }
       ::view-transition-old(app-tab-pane) {
-        animation: vt-tab-out 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: vt-tab-out 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
       ::view-transition-new(app-tab-pane) {
-        animation: vt-tab-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: vt-tab-in 0.54s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
     }
 
@@ -264,12 +283,12 @@
     }
 
     @keyframes vt-tab-out {
-      from { opacity: 1; transform: translateX(0); }
-      to   { opacity: 0; transform: translateX(-10px); }
+      from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+      to   { opacity: 0; transform: translate3d(var(--tab-out-x), 0, 0) scale(0.985); }
     }
     @keyframes vt-tab-in {
-      from { opacity: 0; transform: translateX(12px); }
-      to   { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; transform: translate3d(var(--tab-in-x), 0, 0) scale(0.99); }
+      to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
     }
 
     /* Bottom nav: fixed OUTSIDE .shell so overflow:hidden cannot clip or
@@ -1234,6 +1253,187 @@
       margin-top: 10px;
       font-size: 13px;
       color: var(--text-soft);
+    }
+    .care-summary-hero {
+      position: relative;
+      overflow: hidden;
+      border-radius: 22px;
+      padding: 22px 18px;
+      margin-bottom: 16px;
+      color: var(--on-primary);
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, #1d2a1a), var(--primary-2));
+      box-shadow: 0 10px 28px rgba(63,107,58,0.22);
+    }
+    .care-summary-hero::after {
+      content: '';
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      width: 86px;
+      height: 86px;
+      border: 1px solid rgba(255,255,255,0.24);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .care-summary-hero .eyebrow {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      opacity: 0.82;
+      font-weight: 700;
+    }
+    .care-summary-hero .title,
+    .care-summary-hero .pct {
+      font-family: var(--display-font);
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      line-height: 1;
+      margin: 8px 0 8px;
+    }
+    .care-summary-hero .sub,
+    .care-summary-hero .verdict {
+      max-width: 28ch;
+      font-size: 14px;
+      line-height: 1.45;
+      opacity: 0.92;
+    }
+    .care-action-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .care-action {
+      min-height: 104px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: grid;
+      align-content: space-between;
+      gap: 10px;
+      text-align: left;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .care-action:hover {
+      border-color: var(--primary-tint);
+      box-shadow: var(--shadow-md);
+    }
+    .care-action:active { transform: translateY(1px) scale(0.99); }
+    .care-action .icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+    .care-action .icon svg { width: 18px; height: 18px; }
+    .care-action .label {
+      font-weight: 750;
+      letter-spacing: -0.1px;
+    }
+    .care-action .hint {
+      color: var(--text-soft);
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 2px;
+    }
+    .care-row-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .care-row-card:hover {
+      border-color: var(--primary-tint);
+      box-shadow: var(--shadow-md);
+    }
+    .care-row-card:active { transform: translateY(1px) scale(0.995); }
+    .care-row-card.paused { opacity: 0.68; }
+    .care-row-main { min-width: 0; }
+    .care-row-main .name {
+      font-weight: 700;
+      font-size: 15px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .care-row-main .meta {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-top: 2px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .care-row-side {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+      min-width: 58px;
+    }
+    .care-row-side .pct {
+      font-weight: 800;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .care-row-side .trend {
+      color: var(--text-soft);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .care-row-card > .mini-tag {
+      display: none;
+    }
+    .care-row-card > .pct {
+      justify-self: end;
+      min-width: 54px;
+      text-align: right;
+      font-weight: 800;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .care-page-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .care-page-head .copy {
+      flex: 1;
+      min-width: 0;
+    }
+    .care-page-head .title {
+      font-family: var(--display-font);
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.6px;
+      line-height: 1.05;
+    }
+    .care-page-head .sub {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+    .care-card-stack {
+      display: grid;
+      gap: 12px;
     }
 
     /* =========================================================
@@ -2288,6 +2488,7 @@
 
     @media (max-width: 480px) {
       .mode-pill { font-size: 12.5px; padding: 9px 4px; }
+      .care-action-grid { grid-template-columns: 1fr; }
       .care-invite-accept-row { grid-template-columns: 1fr; }
       .care-accept-btn { width: 100%; }
     }
@@ -5956,7 +6157,8 @@
        TAB CONTENT — Home
        ========================================================= */
     function HomeTab({ activeProfile, personHist, stats, insights,
-                       onStartCheckin, onGoTracker, onToast }) {
+                       onStartCheckin, onGoDashboard, onGoCare,
+                       onGoTracker, onToast }) {
       const thisWeekKey = isoDate(new Date());
       const thisWeek = personHist.find(e =>
         isoDate(new Date(e.when)) === thisWeekKey);
@@ -6239,6 +6441,39 @@
             </div>
           </div>
 
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">Next steps</div>
+                <div className="panel-sub">Pick one path instead of scrolling through everything.</div>
+              </div>
+            </div>
+            <button className="action-row" onClick={onGoDashboard}>
+              <span>Open dashboard</span>
+              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M3 20h18 M6 16l4-6 4 4 5-9"
+                      stroke="currentColor" strokeWidth="1.8"
+                      strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button className="action-row" onClick={onGoTracker}>
+              <span>Update daily tracker</span>
+              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button className="action-row" onClick={onGoCare}>
+              <span>Manage Care Circle</span>
+              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          {false && (
+          <>
           {/* =========================================================
               Safety Net — full feature panel
               ========================================================= */}
@@ -6696,6 +6931,8 @@
             )}
           </div>
 
+          </>
+          )}
         </div>
       );
     }
@@ -7048,7 +7285,7 @@
     }
 
     function InsightsTab({ personHist, stats, insights,
-                            personId, activeProfile }) {
+                            personId, activeProfile, onBack }) {
       const trackerToday = getTrackerToday(activeProfile.personId);
       const dailyDelta   = trackerDelta(trackerToday);
 
@@ -7093,6 +7330,9 @@
 
       return (
         <div className="pane">
+          <button className="chip-btn" onClick={onBack}>
+            Back to Home
+          </button>
           <div className="eyebrow-pill">
             {todayLabel().toUpperCase()}
           </div>
@@ -7348,9 +7588,11 @@
       );
     }
 
-    function CareCircleTab({ profiles, history, activeProfile }) {
+    function CareCircleTab({ profiles, history, activeProfile, onToast }) {
       const [connections, setConnections] = useState(() => loadConnections());
       const [selectedId, setSelectedId] = useState('');
+      const [careView, setCareView] = useState('overview');
+      const [inviteInput, setInviteInput] = useState('');
       const [remoteTracker, setRemoteTracker] = useState({});
 
       useEffect(() => {
@@ -7437,6 +7679,34 @@
         const next = current.map(c => c.id === id ? normalizeConnection({ ...c, ...patch }) : c);
         saveConnections(next);
         setConnections(next);
+        onToast && onToast('Saved');
+      }
+
+      async function handleCreateInvite() {
+        try {
+          const token = await createInviteToken(activeProfile || { personId: 'me', name: 'Me' });
+          const link = inviteLinkForToken(token);
+          try { await navigator.clipboard.writeText(link); } catch {}
+          onToast && onToast('Invite link copied to clipboard');
+        } catch {
+          onToast && onToast('Could not create invite');
+        }
+      }
+
+      async function handleAcceptInvite() {
+        if (!inviteInput) {
+          onToast && onToast('Paste invite link or code first');
+          return;
+        }
+        try {
+          const rec = await acceptInviteToken(extractInviteToken(inviteInput), activeProfile);
+          setConnections(loadConnections());
+          setInviteInput('');
+          setCareView('overview');
+          onToast && onToast(`${rec.name} added to Care Circle`);
+        } catch (e) {
+          onToast && onToast('Invalid invite code');
+        }
       }
 
       function trendFor(hist) {
@@ -7556,16 +7826,114 @@
         );
       }
 
+      if (careView === 'invite') {
+        return (
+          <div className="pane">
+            <div className="care-page-head">
+              <button className="chip-btn" onClick={() => setCareView('overview')}>
+                Back
+              </button>
+              <div className="copy">
+                <div className="title">Invite someone</div>
+                <div className="sub">Create a private link or accept one from a trusted person.</div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="care-invite-block">
+                <button className="care-create-btn" onClick={handleCreateInvite}>
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 5v14M5 12h14"
+                          stroke="currentColor" strokeWidth="2.2"
+                          strokeLinecap="round" />
+                  </svg>
+                  <span>Create invite link</span>
+                </button>
+                <div className="care-create-hint">
+                  A private link is copied so you can send it to one trusted person.
+                </div>
+
+                <div className="care-invite-divider">Have an invite?</div>
+
+                <div className="care-invite-accept-row">
+                  <input className="text-input care-invite-input"
+                         placeholder="Paste invite link or code"
+                         value={inviteInput}
+                         onChange={e => setInviteInput(e.target.value)} />
+                  <button className="cta care-accept-btn"
+                          onClick={handleAcceptInvite}>Accept</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      if (careView === 'sharing') {
+        return (
+          <div className="pane">
+            <div className="care-page-head">
+              <button className="chip-btn" onClick={() => setCareView('overview')}>
+                Back
+              </button>
+              <div className="copy">
+                <div className="title">Sharing settings</div>
+                <div className="sub">Tune what each Care Circle person can see and when they are notified.</div>
+              </div>
+            </div>
+
+            <div className="care-card-stack">
+              {connections.length === 0 ? (
+                <div className="panel">
+                  <div className="panel-title">No connections yet</div>
+                  <div className="panel-sub" style={{ marginBottom: 12 }}>
+                    Invite someone first, then their sharing settings will live here.
+                  </div>
+                  <button className="cta" onClick={() => setCareView('invite')}>
+                    Invite someone
+                  </button>
+                </div>
+              ) : connections.map(c => (
+                <ConnectionCard key={c.id} conn={c} onUpdate={updateConnection} />
+              ))}
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="pane">
-          <div className="home-hero">
-            <div className="eyebrow">Care Circle latest</div>
+          <div className="care-summary-hero">
+            <div className="eyebrow">Care Circle</div>
             <div className="pct">{avg == null ? '—' : `${(avg * 100).toFixed(0)}%`}</div>
             <div className="verdict">
               {acceptedRows.length === 0
                 ? 'Trusted people you connect with will appear here'
                 : `${acceptedRows.length} connected ${acceptedRows.length === 1 ? 'person' : 'people'}${elevated > 0 ? ` · ${elevated} high risk` : ''}`}
             </div>
+          </div>
+
+          <div className="care-action-grid">
+            <button className="care-action" type="button" onClick={() => setCareView('invite')}>
+              <span className="icon">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span>
+                <span className="label">Invite or accept</span>
+                <span className="hint">Create a link or paste an invite code.</span>
+              </span>
+            </button>
+            <button className="care-action" type="button" onClick={() => setCareView('sharing')}>
+              <span className="icon">
+                <ShieldIcon />
+              </span>
+              <span>
+                <span className="label">Sharing settings</span>
+                <span className="hint">Choose what each person can see.</span>
+              </span>
+            </button>
           </div>
 
           <div className="card">
@@ -7580,7 +7948,7 @@
                 </svg>
                 <div className="title">No Care Circle yet</div>
                 <div className="body">
-                  Create or accept an invite from Profile to connect trusted people.
+                  Create or accept an invite here to connect trusted people.
                 </div>
               </div>
             )}
@@ -7595,11 +7963,10 @@
               const showRisk = accepted && latest && allowed.risk;
               return (
                 <div key={conn.id}
-                     className={`care-row ${accepted ? '' : 'paused'}`}
-                     onClick={() => setSelectedId(conn.id)}
-                     style={{ cursor: 'pointer' }}>
+                     className={`care-row-card ${accepted ? '' : 'paused'}`}
+                     onClick={() => setSelectedId(conn.id)}>
                   <Avatar name={conn.name} color={conn.color || colorFor(conn.name)} />
-                  <div style={{ flex: 1 }}>
+                  <div className="care-row-main">
                     <div className="name">{conn.name}</div>
                     <div className="meta">
                       {conn.relationship || 'Friend'} · {accepted ? 'Accepted' : conn.status}
@@ -7860,42 +8227,6 @@
     }) {
       const userCheckins = history.filter(
         e => e.person_id === activeProfile.personId).length;
-      const [inviteInput, setInviteInput] = useState('');
-      const [profileConnections, setProfileConnections] = useState(() => loadConnections());
-
-      useEffect(() => {
-        const refresh = () => setProfileConnections(loadConnections());
-        window.addEventListener('wellcare-connections-changed', refresh);
-        return () => window.removeEventListener('wellcare-connections-changed', refresh);
-      }, []);
-
-      async function handleCreateInvite() {
-        try {
-          const token = await createInviteToken(activeProfile || { personId: 'me', name: 'Me' });
-          const link = inviteLinkForToken(token);
-          try { await navigator.clipboard.writeText(link); } catch {}
-          onToast && onToast('Invite link copied to clipboard');
-        } catch { onToast && onToast('Could not create invite'); }
-      }
-
-      async function handleAcceptInvite() {
-        if (!inviteInput) { onToast && onToast('Paste invite link or code first'); return; }
-        try {
-          const rec = await acceptInviteToken(extractInviteToken(inviteInput), activeProfile);
-          setProfileConnections(loadConnections());
-          setInviteInput('');
-          onToast && onToast(`${rec.name} added to Care Circle`);
-        } catch (e) { onToast && onToast('Invalid invite code'); }
-      }
-
-      function updateConnection(id, patch) {
-        setProfileConnections(prev => {
-          const cs = prev.map(c => c.id === id ? normalizeConnection({ ...c, ...patch }) : c);
-          saveConnections(cs);
-          return cs;
-        });
-        onToast && onToast('Saved');
-      }
       return (
         <div className="pane">
           <div className="eyebrow-pill">Account</div>
@@ -8009,57 +8340,6 @@
 
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title">Care Circle</div>
-            </div>
-            <div style={{ paddingTop: 8, display: 'grid', gap: 14 }}>
-              {/* Invite block — Create is its own prominent action,
-                  Paste + Accept live below a divider so it's clear they
-                  belong to a different flow. */}
-              <div className="care-invite-block">
-                <button className="care-create-btn" onClick={handleCreateInvite}>
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M12 5v14M5 12h14"
-                          stroke="currentColor" strokeWidth="2.2"
-                          strokeLinecap="round" />
-                  </svg>
-                  <span>Create invite link</span>
-                </button>
-                <div className="care-create-hint">
-                  Generates a private link you can share with a trusted person.
-                </div>
-
-                <div className="care-invite-divider">Have an invite?</div>
-
-                <div className="care-invite-accept-row">
-                  <input className="text-input care-invite-input"
-                         placeholder="Paste invite link or code"
-                         value={inviteInput}
-                         onChange={e => setInviteInput(e.target.value)} />
-                  <button className="cta care-accept-btn"
-                          onClick={handleAcceptInvite}>Accept</button>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Your connections</div>
-                <div className="conn-privacy-note" style={{ marginBottom: 10 }}>
-                  You control what each person can see. You can change or
-                  remove access anytime.
-                </div>
-                {profileConnections.length === 0 && (
-                  <div style={{ color: 'var(--text-soft)' }}>
-                    No connections yet — create or accept an invite.
-                  </div>
-                )}
-                {profileConnections.map(c => (
-                  <ConnectionCard key={c.id} conn={c} onUpdate={updateConnection} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-head">
               <div className="panel-title">Data</div>
             </div>
             <EngineSourceStrip info={DATA_FILES_HELP} compact />
@@ -8131,7 +8411,7 @@
     ];
 
     /** Tab bar order — used for subtle slide direction on change */
-    const MAIN_TAB_ORDER = ['home', 'care', 'tracker', 'profile'];
+    const MAIN_TAB_ORDER = ['home', 'insights', 'care', 'tracker', 'profile'];
     const SUPPORTS_VIEW_TRANSITION =
       typeof document !== 'undefined'
       && typeof document.startViewTransition === 'function';
@@ -8213,7 +8493,12 @@
         };
 
         if (SUPPORTS_VIEW_TRANSITION && !reduceMotion) {
-          document.startViewTransition(run);
+          document.documentElement.dataset.tabDir =
+            dir > 0 ? 'fwd' : dir < 0 ? 'back' : 'neutral';
+          const transition = document.startViewTransition(run);
+          transition.finished.finally(() => {
+            delete document.documentElement.dataset.tabDir;
+          });
         } else {
           run();
         }
@@ -8790,8 +9075,20 @@
                   stats={stats}
                   insights={insights}
                   onStartCheckin={startCheckin}
+                  onGoDashboard={() => goTab('insights')}
+                  onGoCare={() => goTab('care')}
                   onGoTracker={() => goTab('tracker')}
                   onToast={setToast}
+                />
+              )}
+              {tab === 'insights' && (
+                <InsightsTab
+                  personHist={personHist}
+                  stats={stats}
+                  insights={insights}
+                  personId={personId}
+                  activeProfile={activeProfile}
+                  onBack={() => goTab('home')}
                 />
               )}
               {tab === 'care' && (
@@ -8799,6 +9096,7 @@
                   profiles={profiles}
                   history={history}
                   activeProfile={activeProfile}
+                  onToast={setToast}
                 />
               )}
               {tab === 'tracker' && (
@@ -8835,9 +9133,9 @@
           <div className="tabbar-dock">
             <nav className="tabbar" aria-label="Primary navigation">
               <button type="button"
-                      className={`tab ${tab === 'home' ? 'active' : ''}`}
+                      className={`tab ${tab === 'home' || tab === 'insights' ? 'active' : ''}`}
                       onClick={() => goTab('home')}>
-                {tabIcons.home(tab === 'home')}
+                {tabIcons.home(tab === 'home' || tab === 'insights')}
                 <span>Home</span>
               </button>
               <button type="button"
