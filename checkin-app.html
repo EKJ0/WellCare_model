@@ -703,8 +703,12 @@
       font-weight: 800;
       letter-spacing: -1px;
       text-align: center;
+      max-width: 12ch;
+      margin-left: auto;
+      margin-right: auto;
       margin-bottom: 8px;
       line-height: 1.15;
+      text-wrap: balance;
     }
     .auth-sub {
       font-size: 15px;
@@ -1253,6 +1257,84 @@
       margin-top: 10px;
       font-size: 13px;
       color: var(--text-soft);
+    }
+    .calm-hero {
+      text-align: center;
+      padding: 24px 18px;
+      margin-bottom: 16px;
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), var(--surface));
+      border: 1px solid var(--border);
+    }
+    .breath-orb {
+      width: 148px;
+      height: 148px;
+      border-radius: 50%;
+      margin: 8px auto 18px;
+      background: radial-gradient(circle at 35% 30%, var(--primary-3), var(--primary));
+      box-shadow: 0 18px 38px rgba(74,114,69,0.22);
+      animation: breathe 7s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(0.82); opacity: 0.72; }
+      45% { transform: scale(1); opacity: 1; }
+    }
+    .calm-title {
+      font-family: var(--display-font);
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.7px;
+      margin-bottom: 8px;
+    }
+    .calm-sub {
+      color: var(--text-muted);
+      font-size: 14.5px;
+      line-height: 1.5;
+      max-width: 30ch;
+      margin: 0 auto;
+    }
+    .calm-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .calm-step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .calm-step .n {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      background: var(--primary-soft);
+      font-weight: 800;
+    }
+    .calm-step .h {
+      font-weight: 750;
+      margin-bottom: 2px;
+    }
+    .calm-step .b {
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.45;
+    }
+    .resource-row {
+      display: grid;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.45;
     }
     .care-summary-hero {
       position: relative;
@@ -1963,6 +2045,8 @@
       padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
       background: var(--surface);
       border-top: 1px solid var(--border);
+      display: grid;
+      gap: 10px;
     }
 
     /* =========================================================
@@ -2055,6 +2139,8 @@
     @media (max-width: 380px) {
       .pane { padding: 14px 12px 20px; }
       .card { padding: 16px; }
+      .auth { padding-left: 18px; padding-right: 18px; }
+      .auth-title { font-size: 30px; }
       .home-hero .pct { font-size: 54px; }
     }
 
@@ -3758,21 +3844,19 @@
 
       if (roundedScore <= 30) {
         recommendedAction =
-          'Maintain routines that help you recover; small habits compound.';
+          'Keep the routine that is working: sleep, one realistic task list, and a real break before the next study block.';
         safetyNetSuggested = false;
       } else if (roundedScore <= 55) {
         recommendedAction =
-          'Schedule real breaks, protect sleep, and lighten one obligation if you can.';
+          'Protect sleep tonight, shrink one deadline or task, and plan one non-scroll break you can actually take.';
         safetyNetSuggested = false;
       } else if (roundedScore <= 75) {
         recommendedAction =
-          'Tell someone you trust how you are doing, cut non-essential load this week, '
-          + 'and consider professional support if this persists.';
+          'Tell one trusted person what is heavy, ask for help with one obligation, and use Calm Now before the next push.';
         safetyNetSuggested = true;
       } else {
         recommendedAction =
-          'Prioritize safety: reach out to a trusted contact or crisis line now, '
-          + 'rest aggressively, and seek urgent professional help if you feel unsafe.';
+          'Prioritize safety and support: contact a trusted person now, pause non-essential work, and seek urgent help if you feel unsafe.';
         safetyNetSuggested = true;
       }
 
@@ -5152,13 +5236,21 @@
       return { history: next, added, skipped };
     }
 
-    /* Reminders — fire once per day. */
+    function reminderDays(value) {
+      return String(value || '')
+        .split(',')
+        .map(v => parseInt(v, 10))
+        .filter(v => Number.isInteger(v) && v >= 0 && v <= 6);
+    }
+
+    /* Reminders — designed for a few-times-a-week student rhythm. */
     async function maybeRemind(history, dow, personId) {
-      if (dow == null || dow === '') return;
+      const days = reminderDays(dow);
+      if (!days.length) return;
       if (!('Notification' in window)) return;
       if (Notification.permission !== 'granted') return;
       const today = new Date();
-      if (today.getDay() !== parseInt(dow)) return;
+      if (!days.includes(today.getDay())) return;
       const todayIso = today.toISOString().slice(0, 10);
       const hasToday = history.some(e =>
         e.person_id === personId
@@ -5168,9 +5260,9 @@
       if (sessionStorage.getItem('reminded_' + todayKey)) return;
       sessionStorage.setItem('reminded_' + todayKey, '1');
       try {
-        new Notification("WellCare check-in", {
-          body: "Two minutes today saves a tough day later. Tap to log how you're doing.",
-          tag: "wellcare-checkin-daily",
+        new Notification("WellCare pulse check", {
+          body: "Quick check-in? A 30-second pulse is enough to keep your weekly pattern useful.",
+          tag: "wellcare-checkin-rhythm",
         });
       } catch {}
     }
@@ -5669,6 +5761,37 @@
         hint: 'Optional. The story behind the numbers.' },
     ];
 
+    const STUDENT_PULSE_QUESTIONS = [
+      { id: 'stress', kind: 'slider',
+        q: 'How stressed do you feel right now?',
+        loEnd: 'calm', hiEnd: 'at limit' },
+      { id: 'deadline_pressure', kind: 'slider',
+        q: 'How heavy is your study/workload today?',
+        loEnd: 'light', hiEnd: 'crushing' },
+      { id: 'sleep', kind: 'number',
+        q: 'How many hours did you sleep last night?',
+        hint: 'A rough number is enough.',
+        min: 3, max: 11, step: 0.5, unit: 'hours last night' },
+      { id: 'mood', kind: 'slider',
+        q: 'How is your mood right now?',
+        loEnd: 'low', hiEnd: 'high' },
+      { id: 'peer_support', kind: 'slider',
+        q: 'How supported do you feel today?',
+        loEnd: 'low', hiEnd: 'strong' },
+      { id: 'feeling', kind: 'feeling',
+        q: "How's your energy feeling right now?",
+        hint: 'Your gut feeling matters.',
+        options: [{ v: 'fine', l: 'Stable' },
+                  { v: 'managing', l: 'Drained' },
+                  { v: 'burned', l: 'Exhausted' }] },
+      { id: 'events', kind: 'chips',
+        q: 'Anything putting extra pressure on you recently?',
+        hint: 'Exams, deadlines, work shifts, money, family, social load - pick what applies.' },
+      { id: 'notes', kind: 'notes',
+        q: 'Want to add a note?',
+        hint: 'Optional. One line is enough.' },
+    ];
+
     function NumField({ label, hint, value, min, max, step, onChange }) {
       // Uncontrolled-ish: we keep a local string so the user can type "5."
       // mid-edit without React snapping it back. We commit on blur (and on
@@ -5870,9 +5993,10 @@
       const enterRef = useRef(true);
       useEffect(() => { enterRef.current = false; }, []);
 
-      const total = QUESTIONS.length;
+      const activeQuestions = STUDENT_PULSE_QUESTIONS;
+      const total = activeQuestions.length;
       const isLast = step === total - 1;
-      const q = QUESTIONS[step];
+      const q = activeQuestions[step];
       const progress = ((step + 1) / total) * 100;
 
       const next = () => {
@@ -5945,7 +6069,7 @@
     /* =========================================================
        RESULT screen
        ========================================================= */
-    function ResultScreen({ result, onDismiss, engineSource }) {
+    function ResultScreen({ result, onDismiss, onCalm, engineSource }) {
       const {
         entry, v, drivers, modelLabel,
         hybridExplain, hybridAction, safetyNetSuggested,
@@ -6027,6 +6151,7 @@
             )}
           </div>
           <div className="result-bottom">
+            <button className="cta secondary" onClick={onCalm}>Calm Now</button>
             <button className="cta" onClick={onDismiss}>Done</button>
           </div>
         </div>
@@ -6157,7 +6282,7 @@
        TAB CONTENT — Home
        ========================================================= */
     function HomeTab({ activeProfile, personHist, stats, insights,
-                       onStartCheckin, onGoDashboard, onGoCare,
+                       onStartCheckin, onGoDashboard, onGoCalm, onGoCare,
                        onGoTracker, onToast }) {
       const thisWeekKey = isoDate(new Date());
       const thisWeek = personHist.find(e =>
@@ -6449,11 +6574,19 @@
               </div>
             </div>
             <button className="action-row" onClick={onGoDashboard}>
-              <span>Open dashboard</span>
+              <span>Open Weekly Review</span>
               <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M3 20h18 M6 16l4-6 4 4 5-9"
                       stroke="currentColor" strokeWidth="1.8"
                       strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button className="action-row" onClick={onGoCalm}>
+              <span>Calm Now</span>
+              <svg className="chev" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3v4M12 17v4M4.6 7.6l2.8 2.8M16.6 16.6l2.8 2.8M3 12h4M17 12h4M4.6 16.4l2.8-2.8M16.6 7.4l2.8-2.8"
+                      stroke="currentColor" strokeWidth="1.8"
+                      strokeLinecap="round"/>
               </svg>
             </button>
             <button className="action-row" onClick={onGoTracker}>
@@ -7327,6 +7460,17 @@
 
       const dims = computeDimensions(personHist);
       const strongest = strongestDimension(dims);
+      const thisWeek = personHist.filter(e => isoDate(new Date(e.when)) === isoDate(new Date()));
+      const lastWeekDate = new Date();
+      lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+      const lastWeekKey = isoDate(lastWeekDate);
+      const lastWeek = personHist.filter(e => isoDate(new Date(e.when)) === lastWeekKey);
+      const avgRisk = list => list.length
+        ? list.reduce((s, e) => s + e.risk, 0) / list.length
+        : null;
+      const thisAvg = avgRisk(thisWeek);
+      const lastAvg = avgRisk(lastWeek);
+      const weeklyDelta = thisAvg != null && lastAvg != null ? thisAvg - lastAvg : null;
 
       return (
         <div className="pane">
@@ -7336,7 +7480,27 @@
           <div className="eyebrow-pill">
             {todayLabel().toUpperCase()}
           </div>
-          <h1 className="display-title">Your Dashboard</h1>
+          <h1 className="display-title">Weekly Review</h1>
+          <div className="stats">
+            <div className="stat">
+              <div className="stat-value">{thisWeek.length}</div>
+              <div className="stat-label">This week</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">
+                {thisAvg == null ? '-' : `${Math.round(thisAvg * 100)}%`}
+              </div>
+              <div className="stat-label">Avg strain</div>
+            </div>
+            <div className="stat">
+              <div className="stat-value">
+                {weeklyDelta == null
+                  ? '-'
+                  : `${weeklyDelta > 0 ? '+' : ''}${Math.round(weeklyDelta * 100)}%`}
+              </div>
+              <div className="stat-label">Vs last week</div>
+            </div>
+          </div>
           <div className="display-sub">
             {personHist.length === 0
               ? 'No check-ins yet — start one from Home.'
@@ -7510,6 +7674,89 @@
     }
 
      /* =========================================================
+       TAB CONTENT — Care Circle
+       ========================================================= */
+    function CalmNowTab({ onBack, onStartCheckin, onGoCare }) {
+      const [mode, setMode] = useState('breath');
+      return (
+        <div className="pane">
+          <button className="chip-btn" onClick={onBack}>Back to Home</button>
+          <div className="eyebrow-pill">Stress reset</div>
+          <h1 className="display-title">Calm Now</h1>
+          <div className="display-sub">
+            A short reset for the moment when stress shows up before you have words for it.
+          </div>
+
+          <div className="calm-hero">
+            <div className="breath-orb" aria-hidden="true" />
+            <div className="calm-title">
+              {mode === 'breath' ? 'Breathe with the circle' : 'Ground your attention'}
+            </div>
+            <div className="calm-sub">
+              {mode === 'breath'
+                ? 'Inhale as it grows, exhale as it settles. Stay for about one minute.'
+                : 'Name five things you see, four you feel, three you hear, two you smell, one you can taste.'}
+            </div>
+          </div>
+
+          <div className="seg compact" style={{ marginBottom: 14 }}>
+            <button className={mode === 'breath' ? 'active' : ''}
+                    onClick={() => setMode('breath')}>Breathing</button>
+            <button className={mode === 'ground' ? 'active' : ''}
+                    onClick={() => setMode('ground')}>Grounding</button>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <div className="panel-title">Tiny next step</div>
+                <div className="panel-sub">Pick one action that feels possible, not perfect.</div>
+              </div>
+            </div>
+            <div className="calm-grid">
+              <div className="calm-step">
+                <div className="n">1</div>
+                <div>
+                  <div className="h">Lower the load</div>
+                  <div className="b">Choose one task to delay, shrink, or ask help with today.</div>
+                </div>
+              </div>
+              <div className="calm-step">
+                <div className="n">2</div>
+                <div>
+                  <div className="h">Reconnect</div>
+                  <div className="b">Message one person: "Today is heavy. Can I vent for five minutes?"</div>
+                </div>
+              </div>
+              <div className="calm-step">
+                <div className="n">3</div>
+                <div>
+                  <div className="h">Log the pattern</div>
+                  <div className="b">Save a quick pulse so your Weekly Review can spot the trigger later.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
+              <div className="panel-title">Need more support?</div>
+            </div>
+            <div className="resource-row">
+              <div>Reach out to campus counselling, a trusted friend, family member, mentor, or your local urgent support line if things feel unsafe.</div>
+              <div>WellCare is not emergency care. If you may hurt yourself or someone else, contact local emergency services now.</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <button className="cta" onClick={onStartCheckin}>Save a quick pulse</button>
+            <button className="cta secondary" onClick={onGoCare}>Open Care Circle</button>
+          </div>
+        </div>
+      );
+    }
+
+    /* =========================================================
        TAB CONTENT — Care Circle
        ========================================================= */
     /* =========================================================
@@ -8227,6 +8474,7 @@
     }) {
       const userCheckins = history.filter(
         e => e.person_id === activeProfile.personId).length;
+      const reminderSet = new Set(reminderDays(reminderDow));
       return (
         <div className="pane">
           <div className="eyebrow-pill">Account</div>
@@ -8281,20 +8529,20 @@
 
           <div className="panel">
             <div className="panel-head">
-              <div className="panel-title">Reminders</div>
+              <div className="panel-title">Reminder rhythm</div>
             </div>
             <div className="pref-row" style={{ paddingTop: 4 }}>
               <div>
-                <div className="pref-label">Daily nudge</div>
-                <div className="pref-hint">A browser notification on the day you pick — fires once that day until you check in.</div>
+                <div className="pref-label">Check-in days</div>
+                <div className="pref-hint">A few gentle nudges per week. Skip anytime without losing progress.</div>
               </div>
               <div className="pref-control">
                 <div className="seg compact">
                   <button className={reminderDow === '' ? 'active' : ''}
                           onClick={() => requestReminder('')}>Off</button>
-                  {[1, 5, 0].map(d => (
+                  {[1, 3, 5, 0].map(d => (
                     <button key={d}
-                            className={String(reminderDow) === String(d) ? 'active' : ''}
+                            className={reminderSet.has(d) ? 'active' : ''}
                             onClick={() => requestReminder(d)}>
                       {DOWS[d]}
                     </button>
@@ -8405,13 +8653,15 @@
        ========================================================= */
     const TABS = [
       { id: 'home',    label: 'Home' },
+      { id: 'calm',    label: 'Calm Now' },
+      { id: 'insights', label: 'Weekly Review' },
       { id: 'care',    label: 'Care Circle' },
       { id: 'tracker', label: 'Tracker' },
       { id: 'profile', label: 'Profile' },
     ];
 
     /** Tab bar order — used for subtle slide direction on change */
-    const MAIN_TAB_ORDER = ['home', 'insights', 'care', 'tracker', 'profile'];
+    const MAIN_TAB_ORDER = ['home', 'calm', 'insights', 'care', 'tracker', 'profile'];
     const SUPPORTS_VIEW_TRANSITION =
       typeof document !== 'undefined'
       && typeof document.startViewTransition === 'function';
@@ -8881,8 +9131,13 @@
         }
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
-          setReminderDow(String(dow));
-          setToast(`I'll remind you on ${DOWS[dow]}s`);
+          const days = new Set(reminderDays(reminderDow));
+          days.has(dow) ? days.delete(dow) : days.add(dow);
+          const next = [...days].sort((a, b) => a - b).join(',');
+          setReminderDow(next);
+          setToast(next
+            ? `Reminder rhythm: ${[...days].sort((a, b) => a - b).map(d => DOWS[d]).join(', ')}`
+            : 'Reminders off');
         } else {
           setToast('Reminder permission denied');
         }
@@ -9076,9 +9331,17 @@
                   insights={insights}
                   onStartCheckin={startCheckin}
                   onGoDashboard={() => goTab('insights')}
+                  onGoCalm={() => goTab('calm')}
                   onGoCare={() => goTab('care')}
                   onGoTracker={() => goTab('tracker')}
                   onToast={setToast}
+                />
+              )}
+              {tab === 'calm' && (
+                <CalmNowTab
+                  onBack={() => goTab('home')}
+                  onStartCheckin={startCheckin}
+                  onGoCare={() => goTab('care')}
                 />
               )}
               {tab === 'insights' && (
@@ -9133,9 +9396,9 @@
           <div className="tabbar-dock">
             <nav className="tabbar" aria-label="Primary navigation">
               <button type="button"
-                      className={`tab ${tab === 'home' || tab === 'insights' ? 'active' : ''}`}
+                      className={`tab ${tab === 'home' || tab === 'calm' || tab === 'insights' ? 'active' : ''}`}
                       onClick={() => goTab('home')}>
-                {tabIcons.home(tab === 'home' || tab === 'insights')}
+                {tabIcons.home(tab === 'home' || tab === 'calm' || tab === 'insights')}
                 <span>Home</span>
               </button>
               <button type="button"
@@ -9188,6 +9451,10 @@
 
           {result && (
             <ResultScreen result={result} engineSource={engineSource}
+                          onCalm={() => {
+                            setResult(null);
+                            goTab('calm');
+                          }}
                           onDismiss={handleDismissResult} />
           )}
 
