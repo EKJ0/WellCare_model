@@ -8,6 +8,7 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wellcare-test-'));
 process.env.WELLCARE_DB_PATH = path.join(tempDir, 'db.json');
 
 const app = require('./index');
+const { calculateAdaptiveRisk, DIAGNOSTIC_TERMS } = require('./lib/scoring');
 
 function request(port, options, body) {
   return new Promise((resolve, reject) => {
@@ -30,6 +31,81 @@ function request(port, options, body) {
 }
 
 async function run() {
+  const low = calculateAdaptiveRisk({
+    stress: 2,
+    energy: 8,
+    sleepQuality: 8,
+    overwhelm: 2,
+    studyWorkPressure: 3,
+    recoveryTime: 8,
+    motivation: 8,
+    focus: 8,
+    socialBattery: 8,
+  }, [], { trackerToday: { socialConnection: 'Supportive', recoveryTime: 'Real rest' } });
+  assert.ok(low.scorePct <= 30, `low-risk check-in should stay low, got ${low.scorePct}`);
+
+  const high = calculateAdaptiveRisk({
+    stress: 9,
+    energy: 2,
+    sleepQuality: 2,
+    overwhelm: 9,
+    studyWorkPressure: 9,
+    recoveryTime: 2,
+    motivation: 2,
+    focus: 2,
+    socialBattery: 2,
+  }, [], { trackerToday: { socialConnection: 'Isolated', recoveryTime: 'None' } });
+  assert.ok(high.scorePct >= 70, `high-risk check-in should be high, got ${high.scorePct}`);
+
+  const repeatedStressHistory = Array.from({ length: 4 }, () => ({
+    stress: 8,
+    sleepQuality: 5,
+    recoveryTime: 4,
+    overwhelm: 7,
+    socialBattery: 5,
+    risk: 0.6,
+  }));
+  const oneHighDay = calculateAdaptiveRisk({ stress: 8, energy: 5, sleepQuality: 6, overwhelm: 6, recoveryTime: 5 }, [], {});
+  const repeatedHighDays = calculateAdaptiveRisk({ stress: 8, energy: 5, sleepQuality: 6, overwhelm: 6, recoveryTime: 5 }, repeatedStressHistory, {});
+  assert.ok(repeatedHighDays.scorePct > oneHighDay.scorePct, 'repeated high-stress days should increase risk');
+
+  const afterHigh = calculateAdaptiveRisk({
+    stress: 3,
+    energy: 8,
+    sleepQuality: 8,
+    overwhelm: 3,
+    recoveryTime: 8,
+  }, [{ risk: 0.86, stress: 9, sleepQuality: 2 }], {});
+  assert.ok(afterHigh.scorePct > low.scorePct, 'recovery should decrease risk gradually after a high-risk day');
+
+  const neutralSocial = calculateAdaptiveRisk({ stress: 6, energy: 5, sleepQuality: 6, overwhelm: 6 }, [], { trackerToday: { socialConnection: 'Neutral' } });
+  const supportiveSocial = calculateAdaptiveRisk({ stress: 6, energy: 5, sleepQuality: 6, overwhelm: 6 }, [], { trackerToday: { socialConnection: 'Supportive' } });
+  const drainingSocial = calculateAdaptiveRisk({ stress: 6, energy: 5, sleepQuality: 6, overwhelm: 6 }, [], { trackerToday: { socialConnection: 'Draining' } });
+  assert.ok(supportiveSocial.scorePct < neutralSocial.scorePct, 'supportive social connection should lower risk slightly');
+  assert.ok(drainingSocial.scorePct > neutralSocial.scorePct, 'draining social interaction should raise risk slightly');
+
+  const drinkingToCope = calculateAdaptiveRisk({ stress: 6, energy: 5, sleepQuality: 6, overwhelm: 6 }, [], { trackerToday: { alcohol: 'To cope' } });
+  const socialDrinking = calculateAdaptiveRisk({ stress: 6, energy: 5, sleepQuality: 6, overwhelm: 6 }, [], { trackerToday: { alcohol: 'Connected', socialConnection: 'Supportive' } });
+  assert.ok(drinkingToCope.scorePct > neutralSocial.scorePct, 'drinking to cope should raise risk');
+  assert.ok(socialDrinking.scorePct <= neutralSocial.scorePct, 'light supportive social drinking should not automatically raise risk');
+
+  const baselineHistory = Array.from({ length: 21 }, () => ({
+    stress: 3,
+    sleepQuality: 8,
+    recoveryTime: 8,
+    socialBattery: 8,
+    risk: 0.2,
+  }));
+  const withoutBaseline = calculateAdaptiveRisk({ stress: 5, energy: 7, sleepQuality: 6, overwhelm: 4, recoveryTime: 6, socialBattery: 6 }, [], {});
+  const withBaseline = calculateAdaptiveRisk({ stress: 5, energy: 7, sleepQuality: 6, overwhelm: 4, recoveryTime: 6, socialBattery: 6 }, baselineHistory, {});
+  assert.strictEqual(withBaseline.baselineStatus, 'warming_up');
+  assert.ok(withBaseline.scorePct > withoutBaseline.scorePct, 'personal baseline adjustment should work after enough data');
+
+  const explanation = calculateAdaptiveRisk({ stress: 8, energy: 4, sleepQuality: 4, overwhelm: 8 }, [], {}).explanation.toLowerCase();
+  for (const term of DIAGNOSTIC_TERMS) {
+    assert.ok(!explanation.includes(term), `GPT-style explanation should avoid diagnostic language: ${term}`);
+  }
+
   const server = app.listen(0);
   const port = server.address().port;
   try {

@@ -1,9 +1,10 @@
-# WellCare Burnout-Risk Prototype
+# WellCare Stress / Academic Burnout-Risk Prototype
 
 A student- and young-adult-focused burnout-risk check-in prototype you can run
 locally. The app tracks self-reported patterns related to stress, emotional
-overload, recovery, and trusted support. It is not a diagnostic or clinical
-tool.
+overload, academic pressure, and recovery. It is not a diagnostic or clinical
+tool and does not diagnose depression, anxiety, burnout, or any medical
+condition.
 
 The current app is intentionally still a standalone single-file React PWA
 (`checkin-app.html`) for university demo speed. Longer term, migrate it to a
@@ -17,26 +18,27 @@ Current product direction:
 - Keep `checkin-app.html` as the main working demo app for now.
 - `archive/checkin-app.jsx` is an archived simple mock and should not be used
   as the source of truth.
-- The former Team concept is now Care Circle: trusted people, connection
-  invites, per-connection alert thresholds, shared tracker privacy settings,
-  and in-app notifications.
-- Default sharing is limited to burnout risk percentage, risk level, trend, and
-  last check-in time. Private answers, notes, exact habit details, and sensitive
-  explanations stay hidden unless explicitly enabled later.
-- Daily Tracker entries now produce a Recovery Status from sleep quality,
-  hydration, movement, breaks, real rest, social connection, and habit context.
-  It is shown in the app, shared only when a connection allows recovery-status
-  sharing, and exported with CSV history for future model training.
+- The MVP is individual-first: user downloads app, tracks themselves over time,
+  WellCare learns their personal baseline, then shows non-diagnostic stress /
+  academic burnout-risk insights.
+- Care Circle, tracker sharing, trusted-person nudges, and family/couple sharing
+  are optional future/support features. They are not the core user journey.
+- Daily check-ins collect stress, energy, sleep, overwhelm/work pressure, focus,
+  motivation, recovery time, social battery, social interaction quality,
+  optional substance-use context, and optional short journaling.
+- Daily Tracker entries produce a Recovery Status from sleep quality, movement,
+  breaks, real rest, screen-time context, social connection, and substance-use
+  context. Context/habits are small modifiers, not the main risk engine.
 
 Next recommended steps:
 
 1. Keep the standalone PWA for the next demo, then migrate to React/Vite when
    the screen flows stabilize. See `docs/ARCHITECTURE.md`.
 2. Replace prototype localStorage sync with authenticated cloud storage for
-   users, check-ins, connections, shared tracker settings, notifications, alert
-   thresholds, and alert history.
-3. Add app-level tests for scoring, context-aware habit modifiers, privacy
-   boundaries, alert thresholds, and notification cooldowns.
+   users, check-ins, daily tracker context, baseline summaries, weekly summaries,
+   and anonymized exports.
+3. Add app-level tests for scoring, context-aware habit modifiers, personal
+   baseline behavior, privacy/export boundaries, and optional sharing settings.
 
 
 ## Quick start
@@ -253,8 +255,7 @@ edit to `scenarios.py` / `models.py` / `train.py`.
 ## What this is and isn't
 
 - **It is** a self-reflection tool with a defensible prototype model behind it,
-  intended for personal wellbeing tracking and trusted Care Circle support.
-- **It is not** a diagnosis, an AI therapist, a mental illness score, an HR
-  surveillance tool, or a clinical risk system. Anyone making decisions based on
-  its outputs should run `calibration_plot.py` first to see what its
-  probabilities actually mean.
+  intended for personal stress, recovery, and academic burnout-risk tracking.
+- **It is not** a diagnostic or medical tool. Anyone using the model for
+  research should run `calibration_plot.py` first to see what its probabilities
+  actually mean.
